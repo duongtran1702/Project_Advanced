@@ -46,7 +46,7 @@ public class MenuEofSmokeTest {
             WalletService walletService = new com.atmin.saber.service.impl.WalletServiceImpl(userDao, txDao, db);
 
             Scanner sc = new Scanner(new ByteArrayInputStream(new byte[0]));
-            CustomerMenu customerMenu = new CustomerMenu(BookingController.createDefault(), orderService, walletService, sc);
+            CustomerMenu customerMenu = new CustomerMenu(BookingController.createDefault(), orderService, walletService, productService, sc);
             customerMenu.showMenu();
         });
     }
@@ -80,7 +80,7 @@ public class MenuEofSmokeTest {
             WalletService walletService = new com.atmin.saber.service.impl.WalletServiceImpl(userDao, txDao, db);
 
             Scanner sc = new Scanner(new ByteArrayInputStream(script.getBytes(StandardCharsets.UTF_8)));
-            CustomerMenu customerMenu = new CustomerMenu(BookingController.createDefault(), orderService, walletService, sc);
+            CustomerMenu customerMenu = new CustomerMenu(BookingController.createDefault(), orderService, walletService, productService, sc);
             customerMenu.showMenu();
         });
     }

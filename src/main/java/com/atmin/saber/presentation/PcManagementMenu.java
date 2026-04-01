@@ -40,11 +40,11 @@ public class PcManagementMenu {
         while (true) {
             System.out.println(CYAN + BOLD + "\n  === PC MANAGEMENT SYSTEM ===" + RESET);
             System.out.println("\t1. View PC List");
-            System.out.println("\t5. View Room List");
-            System.out.println("\t6. View PCs by Room");
             System.out.println("\t2. Add New PC");
             System.out.println("\t3. Edit PC Info");
             System.out.println("\t4. Delete PC");
+            System.out.println("\t5. View Room List");
+            System.out.println("\t6. View PCs by Room");
             System.out.println("\t0. Back to Admin System");
             System.out.print(GREEN + "  ➤ Select an option: " + RESET);
 

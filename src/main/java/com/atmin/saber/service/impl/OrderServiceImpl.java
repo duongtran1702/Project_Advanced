@@ -135,6 +135,21 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public int advanceAllPendingOrdersForStaff() {
+        List<Order> pending = orderDao.findPendingForStaff(); // already FIFO by ORDER BY order_time ASC
+        int updated = 0;
+        for (Order o : pending) {
+            if (o == null || o.getOrderId() == null || o.getOrderId().isBlank()) continue;
+            if (o.getStatus() == null || !o.getStatus().isStaffUpdatable()) continue;
+
+            OrderStatus next = o.getStatus().nextForStaff();
+            boolean ok = orderDao.updateStatus(o.getOrderId(), next.name());
+            if (ok) updated++;
+        }
+        return updated;
+    }
+
+    @Override
     public Optional<Order> getLatestOrderOfCustomer(String customerId) {
         if (customerId == null || customerId.isBlank()) return Optional.empty();
         return orderDao.findLatestByCustomerId(customerId);

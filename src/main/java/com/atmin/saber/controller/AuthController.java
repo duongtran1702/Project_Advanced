@@ -107,7 +107,7 @@ public class AuthController {
         SessionContext.clearCurrentUser();
         SessionContext.setCurrentRole(UserRole.CUSTOMER);
 
-        // Guest menu (restricted): reuse CustomerMenu but it will block actions requiring login.
+        // Guest menu (restricted): reuse CustomerMenu, but it will block actions requiring login.
         CustomerMenu customerMenu = CustomerMenu.createDefault(sc);
         customerMenu.showMenu();
 

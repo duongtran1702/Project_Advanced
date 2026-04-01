@@ -12,13 +12,8 @@ import java.util.Optional;
 
 public interface OrderService {
     /**
-     * Create an F&B order linked to a booking, default status PENDING.
-     * Inputs:
-     * - customerId: current customer
-     * - booking: booking to link
-     * - items: productId -> quantity
-     *
-     * @return CreatedOrder (order + its details)
+     * Value object returned by {@link #createOrderForBooking(String, Booking, Map)}.
+     * It contains the created order and its detail lines.
      */
     record CreatedOrder(Order order, List<OrderDetail> details) {
     }
@@ -34,6 +29,16 @@ public interface OrderService {
      * Staff: advance order status (PENDING -> PREPARING -> SERVED).
      */
     OrderStatus advanceOrderStatusForStaff(String orderId);
+
+    /**
+     * Staff: advance status for ALL pending orders (FIFO by order_time ASC).
+     * Each order advances exactly one step:
+     * - PENDING -> PREPARING
+     * - PREPARING -> SERVED
+     *
+     * @return number of orders successfully updated.
+     */
+    int advanceAllPendingOrdersForStaff();
 
     /**
      * Customer: view latest order (by order_time).

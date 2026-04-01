@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -70,8 +71,6 @@ public class BookingServiceImpl implements BookingService {
         if (minutes <= 0) {
             throw new RuntimeException("End time must be after start time");
         }
-        // Round up: minimum 1 minute
-        minutes = Math.max(1, minutes);
 
         BigDecimal hourlyRate = getHourlyRateForZone(pc.getRoomName());
         BigDecimal perMinute = hourlyRate.divide(BigDecimal.valueOf(60), 2, java.math.RoundingMode.HALF_UP);
@@ -117,7 +116,7 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public Map<String, List<PC>> getAvailablePCsGroupedByZone() {
         List<PC> availablePCs = getAvailablePCsByZone();
-        Map<String, List<PC>> groupedPCs = new HashMap<>();
+        Map<String, List<PC>> groupedPCs = new LinkedHashMap<>();
         
         for (PC pc : availablePCs) {
             groupedPCs.computeIfAbsent(pc.getRoomName(), k -> new java.util.ArrayList<>()).add(pc);

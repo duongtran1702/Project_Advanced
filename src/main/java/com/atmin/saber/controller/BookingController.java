@@ -77,15 +77,15 @@ public class BookingController {
         
         for (Map.Entry<String, List<PC>> entry : pcsByZone.entrySet()) {
             System.out.println("\n" + entry.getKey().toUpperCase() + ":");
-            System.out.println("+------+----------------------+--------+");
-            System.out.printf("| %-4s | %-20s | %-6s |%n", "ID", "NAME", "STATUS");
-            System.out.println("+------+----------------------+--------+");
+            System.out.println("+------+----------------------+--------------+");
+            System.out.printf("| %-4s | %-20s | %-12s |%n", "ID", "NAME", "STATUS");
+            System.out.println("+------+----------------------+--------------+");
             
             for (PC pc : entry.getValue()) {
-                System.out.printf("| %-4d | %-20s | %-6s |%n", 
+                System.out.printf("| %-4d | %-20s | %-12s |%n",
                     pc.getPcId(), pc.getPcName(), "Available");
             }
-            System.out.println("+------+----------------------+--------+");
+            System.out.println("+------+----------------------+--------------+");
         }
     }
     

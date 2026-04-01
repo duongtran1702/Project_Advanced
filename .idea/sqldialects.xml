@@ -7,6 +7,7 @@
     <file url="file://$PROJECT_DIR$/src/main/java/com/atmin/saber/dao/impl/ProductDaoImpl.java" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/src/main/java/com/atmin/saber/dao/impl/RoomDaoImpl.java" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/src/main/java/com/atmin/saber/dao/impl/UserDaoImpl.java" dialect="GenericSQL" />
+    <file url="file://$PROJECT_DIR$/src/main/java/com/atmin/saber/presentation/CustomerMenu.java" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/src/main/resources/db.sql" dialect="MySQL" />
   </component>
 </project>

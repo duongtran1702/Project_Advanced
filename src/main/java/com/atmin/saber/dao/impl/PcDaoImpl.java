@@ -23,10 +23,8 @@ public class PcDaoImpl implements PcDao {
 
     @Override
     public List<PC> findAllActive() {
-        String sql = "SELECT p.pc_id, p.pc_name, p.zone_id AS room_id, r.room_name AS room_name, p.status, " +
-                "s.cpu, s.ram_gb, s.gpu, s.storage_gb, s.monitor_hz, s.os, s.notes " +
+        String sql = "SELECT p.pc_id, p.pc_name, p.zone_id AS room_id, r.room_name AS room_name, p.status " +
                 "FROM pcs p JOIN rooms r ON p.zone_id = r.room_id " +
-                "LEFT JOIN pc_specs s ON s.pc_id = p.pc_id " +
                 "WHERE p.status <> 'DELETED' ORDER BY p.pc_id DESC";
         List<PC> pcs = new ArrayList<>();
         try (Connection con = db.getConnection();
@@ -44,10 +42,8 @@ public class PcDaoImpl implements PcDao {
 
     @Override
     public List<PC> findAllActiveByRoomId(int roomId) {
-        String sql = "SELECT p.pc_id, p.pc_name, p.zone_id AS room_id, r.room_name AS room_name, p.status, " +
-                "s.cpu, s.ram_gb, s.gpu, s.storage_gb, s.monitor_hz, s.os, s.notes " +
+        String sql = "SELECT p.pc_id, p.pc_name, p.zone_id AS room_id, r.room_name AS room_name, p.status " +
                 "FROM pcs p JOIN rooms r ON p.zone_id = r.room_id " +
-                "LEFT JOIN pc_specs s ON s.pc_id = p.pc_id " +
                 "WHERE p.status <> 'DELETED' AND p.zone_id = ? ORDER BY p.pc_id DESC";
         List<PC> pcs = new ArrayList<>();
         try (Connection con = db.getConnection();
@@ -66,10 +62,8 @@ public class PcDaoImpl implements PcDao {
 
     @Override
     public Optional<PC> findById(int pcId) {
-        String sql = "SELECT p.pc_id, p.pc_name, p.zone_id AS room_id, r.room_name AS room_name, p.status, " +
-                "s.cpu, s.ram_gb, s.gpu, s.storage_gb, s.monitor_hz, s.os, s.notes " +
+        String sql = "SELECT p.pc_id, p.pc_name, p.zone_id AS room_id, r.room_name AS room_name, p.status " +
                 "FROM pcs p JOIN rooms r ON p.zone_id = r.room_id " +
-                "LEFT JOIN pc_specs s ON s.pc_id = p.pc_id " +
                 "WHERE p.pc_id = ?";
         try (Connection con = db.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
@@ -155,20 +149,6 @@ public class PcDaoImpl implements PcDao {
         }
         pc.setRoomName(rs.getString("room_name"));
 
-        // Spec is optional (LEFT JOIN)
-        PC.Spec spec = null;
-        String cpu = safeGetString(rs, "cpu");
-        Integer ramGb = safeGetInt(rs, "ram_gb");
-        String gpu = safeGetString(rs, "gpu");
-        Integer storageGb = safeGetInt(rs, "storage_gb");
-        Integer monitorHz = safeGetInt(rs, "monitor_hz");
-        String os = safeGetString(rs, "os");
-        String notes = safeGetString(rs, "notes");
-        if (cpu != null || ramGb != null || gpu != null || storageGb != null || monitorHz != null || os != null || notes != null) {
-            spec = new PC.Spec(pc.getPcId(), cpu, ramGb, gpu, storageGb, monitorHz, os, notes);
-        }
-        pc.setSpec(spec);
-
         String statusStr = rs.getString("status");
         try {
             pc.setStatus(PCStatus.valueOf(statusStr));
@@ -177,23 +157,6 @@ public class PcDaoImpl implements PcDao {
             pc.setStatus(PCStatus.MAINTENANCE);
         }
         return pc;
-    }
-
-    private static String safeGetString(ResultSet rs, String column) {
-        try {
-            return rs.getString(column);
-        } catch (SQLException e) {
-            return null;
-        }
-    }
-
-    private static Integer safeGetInt(ResultSet rs, String column) {
-        try {
-            int v = rs.getInt(column);
-            return rs.wasNull() ? null : v;
-        } catch (SQLException e) {
-            return null;
-        }
     }
 }
 
