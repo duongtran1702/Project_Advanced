@@ -26,7 +26,7 @@ public final class AppFactory {
     }
 
     public static OrderService orderService() {
-        return new OrderServiceImpl(new OrderDaoImpl(DB), new OrderDetailDaoImpl(DB), productService());
+        return new OrderServiceImpl(new OrderDaoImpl(DB), new OrderDetailDaoImpl(DB), productService(), walletService());
     }
 
     public static WalletService walletService() {

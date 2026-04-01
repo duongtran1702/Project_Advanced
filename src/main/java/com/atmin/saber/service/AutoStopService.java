@@ -6,7 +6,5 @@ package com.atmin.saber.service;
  */
 public interface AutoStopService {
     void start();
-
-    void stop();
 }
 

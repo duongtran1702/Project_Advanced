@@ -8,6 +8,5 @@ public interface OrderDetailDao {
     /**
      * Find all order detail rows for an order.
      */
-    List<OrderDetail> findByOrderId(String orderId);
+    List<OrderDetail> findByOrderId(int orderId);
 }
-

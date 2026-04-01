@@ -58,5 +58,5 @@ test {
 }
 
 application {
-    mainClass = 'com.atmin.saber.Main'
+    mainClass = findProperty('mainClass') ?: 'com.atmin.saber.Main'
 }

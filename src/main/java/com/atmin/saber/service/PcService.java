@@ -12,8 +12,6 @@ public interface PcService {
 
     Optional<PC> getById(int pcId);
 
-    boolean existsById(int pcId);
-
     void add(PC pc);
 
     void update(PC pc);

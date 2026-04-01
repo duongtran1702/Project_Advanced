@@ -3,11 +3,13 @@
   <component name="SqlDialectMappings">
     <file url="file://$PROJECT_DIR$/README.md" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/src/main/java/com/atmin/saber/dao/impl/BookingDaoImpl.java" dialect="GenericSQL" />
+    <file url="file://$PROJECT_DIR$/src/main/java/com/atmin/saber/dao/impl/OrderDaoImpl.java" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/src/main/java/com/atmin/saber/dao/impl/PcDaoImpl.java" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/src/main/java/com/atmin/saber/dao/impl/ProductDaoImpl.java" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/src/main/java/com/atmin/saber/dao/impl/RoomDaoImpl.java" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/src/main/java/com/atmin/saber/dao/impl/UserDaoImpl.java" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/src/main/java/com/atmin/saber/presentation/CustomerMenu.java" dialect="GenericSQL" />
+    <file url="file://$PROJECT_DIR$/src/main/java/com/atmin/saber/service/impl/OrderServiceImpl.java" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/src/main/resources/db.sql" dialect="MySQL" />
   </component>
 </project>

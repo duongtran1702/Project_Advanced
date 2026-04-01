@@ -32,5 +32,10 @@ public interface SessionBillingService {
      * exactly that amount.
      */
     void autoStopIfOutOfBalance(String customerId);
+
+    /**
+     * Helper calculation: how much debt the customer currently owes for PC usage in their active session.
+     */
+    BigDecimal calculateCurrentDebt(String customerId);
 }
 

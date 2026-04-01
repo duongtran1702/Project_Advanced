@@ -36,14 +36,16 @@ public class MenuEofSmokeTest {
             com.atmin.saber.service.ProductService productService = new com.atmin.saber.service.impl.ProductServiceImpl(
                     new com.atmin.saber.dao.impl.ProductDaoImpl(db)
             );
-            OrderService orderService = new com.atmin.saber.service.impl.OrderServiceImpl(
-                    new com.atmin.saber.dao.impl.OrderDaoImpl(db),
-                    new com.atmin.saber.dao.impl.OrderDetailDaoImpl(db),
-                    productService
-            );
             com.atmin.saber.dao.UserDao userDao = new com.atmin.saber.dao.impl.UserDaoImpl(db);
             com.atmin.saber.dao.TransactionDao txDao = new com.atmin.saber.dao.impl.TransactionDaoImpl(db);
             WalletService walletService = new com.atmin.saber.service.impl.WalletServiceImpl(userDao, txDao, db);
+
+            OrderService orderService = new com.atmin.saber.service.impl.OrderServiceImpl(
+                    new com.atmin.saber.dao.impl.OrderDaoImpl(db),
+                    new com.atmin.saber.dao.impl.OrderDetailDaoImpl(db),
+                    productService,
+                    walletService
+            );
 
             Scanner sc = new Scanner(new ByteArrayInputStream(new byte[0]));
             CustomerMenu customerMenu = new CustomerMenu(BookingController.createDefault(), orderService, walletService, productService, sc);
@@ -70,14 +72,16 @@ public class MenuEofSmokeTest {
             com.atmin.saber.service.ProductService productService = new com.atmin.saber.service.impl.ProductServiceImpl(
                     new com.atmin.saber.dao.impl.ProductDaoImpl(db)
             );
-            OrderService orderService = new com.atmin.saber.service.impl.OrderServiceImpl(
-                    new com.atmin.saber.dao.impl.OrderDaoImpl(db),
-                    new com.atmin.saber.dao.impl.OrderDetailDaoImpl(db),
-                    productService
-            );
             com.atmin.saber.dao.UserDao userDao = new com.atmin.saber.dao.impl.UserDaoImpl(db);
             com.atmin.saber.dao.TransactionDao txDao = new com.atmin.saber.dao.impl.TransactionDaoImpl(db);
             WalletService walletService = new com.atmin.saber.service.impl.WalletServiceImpl(userDao, txDao, db);
+
+            OrderService orderService = new com.atmin.saber.service.impl.OrderServiceImpl(
+                    new com.atmin.saber.dao.impl.OrderDaoImpl(db),
+                    new com.atmin.saber.dao.impl.OrderDetailDaoImpl(db),
+                    productService,
+                    walletService
+            );
 
             Scanner sc = new Scanner(new ByteArrayInputStream(script.getBytes(StandardCharsets.UTF_8)));
             CustomerMenu customerMenu = new CustomerMenu(BookingController.createDefault(), orderService, walletService, productService, sc);

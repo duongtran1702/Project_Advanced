@@ -12,8 +12,6 @@ public interface PcDao {
 
     Optional<PC> findById(int pcId);
 
-    boolean existsById(int pcId);
-
     void insert(PC pc);
 
     void update(PC pc);

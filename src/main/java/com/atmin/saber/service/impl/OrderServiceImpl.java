@@ -9,6 +9,7 @@ import com.atmin.saber.model.Product;
 import com.atmin.saber.model.enums.OrderStatus;
 import com.atmin.saber.service.OrderService;
 import com.atmin.saber.service.ProductService;
+import com.atmin.saber.service.WalletService;
 import com.atmin.saber.util.DBConnection;
 
 import java.math.BigDecimal;
@@ -16,30 +17,23 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.Optional;
 
 public class OrderServiceImpl implements OrderService {
 
     private final OrderDao orderDao;
     private final OrderDetailDao orderDetailDao;
     private final ProductService productService;
+    private final WalletService walletService;
     private final DBConnection db;
 
-    public OrderServiceImpl(OrderDao orderDao, OrderDetailDao orderDetailDao, ProductService productService) {
+    public OrderServiceImpl(OrderDao orderDao, OrderDetailDao orderDetailDao, ProductService productService, WalletService walletService) {
         this.orderDao = orderDao;
         this.orderDetailDao = orderDetailDao;
         this.productService = productService;
+        this.walletService = walletService;
         this.db = DBConnection.getInstance();
-    }
-
-    /**
-     * Backward-compatible constructor (details view will not be available if DAO is missing).
-     */
-    public OrderServiceImpl(OrderDao orderDao, ProductService productService) {
-        this(orderDao, null, productService);
     }
 
     @Override
@@ -54,7 +48,9 @@ public class OrderServiceImpl implements OrderService {
                 BigDecimal total = BigDecimal.ZERO;
                 List<OrderDetail> details = new ArrayList<>();
 
-                // 1) decrease stock for all items (or rollback)
+                // 1) Build order details & total.
+                // IMPORTANT: Do NOT decrease stock here.
+                // Stock will be deducted when staff accepts/advances the order.
                 for (Map.Entry<Integer, Integer> entry : items.entrySet()) {
                     int productId = entry.getKey();
                     int qty = entry.getValue() == null ? 0 : entry.getValue();
@@ -63,25 +59,19 @@ public class OrderServiceImpl implements OrderService {
                     Product p = productService.getById(productId)
                             .orElseThrow(() -> new RuntimeException("Product not found: " + productId));
 
-                    boolean ok = productService.decreaseStockIfEnough(con, productId, qty);
-                    if (!ok) {
-                        throw new RuntimeException("Not enough stock for product: " + p.getProductName());
-                    }
-
                     BigDecimal unitPrice = p.getPrice() == null ? BigDecimal.ZERO : p.getPrice();
                     total = total.add(unitPrice.multiply(BigDecimal.valueOf(qty)));
 
                     OrderDetail d = new OrderDetail();
-                    d.setOrderId(null);
+                    d.setOrderId(-1);
                     d.setId(productId);
                     d.setQuantity(qty);
                     d.setUnitPrice(unitPrice);
                     details.add(d);
                 }
 
-                // 2) insert order + details
+                // 2) Insert order + details (still in a transaction).
                 Order order = new Order();
-                order.setOrderId(UUID.randomUUID().toString());
                 order.setCustomerId(customerId);
                 order.setOrderTime(LocalDateTime.now());
                 order.setStatus(OrderStatus.PENDING);
@@ -116,22 +106,139 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public OrderStatus advanceOrderStatusForStaff(String orderId) {
-        if (orderId == null || orderId.isBlank()) {
-            throw new IllegalArgumentException("orderId is required");
-        }
-
+    public OrderStatus advanceOrderStatusForStaff(int orderId) {
         // We don't have a findById yet; re-use list and locate by id.
         // (keeps change small and compatible with existing DAO)
         Order current = orderDao.findPendingForStaff().stream()
-                .filter(o -> orderId.equals(o.getOrderId()))
+                .filter(o -> orderId == o.getOrderId())
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Order not found or not updatable: " + orderId));
 
         OrderStatus next = current.getStatus().nextForStaff();
+
+        // Staff ACCEPTS the order when moving from PENDING -> COMPLETED.
+        // At acceptance time, we must deduct inventory. If out of stock, we reject + refund.
+        if (current.getStatus() == OrderStatus.PENDING && next == OrderStatus.COMPLETED) {
+            if (orderDetailDao == null || walletService == null) {
+                throw new IllegalStateException("OrderDetailDao/WalletService is not configured");
+            }
+
+            try (Connection con = db.getConnection()) {
+                boolean oldAutoCommit = con.getAutoCommit();
+                con.setAutoCommit(false);
+                try {
+                    // 1) Check & decrease stock for all items
+                    List<OrderDetail> items = orderDetailDao.findByOrderId(orderId);
+                    for (OrderDetail d : items) {
+                        int pid = d.getId();
+                        int qty = d.getQuantity() == null ? 0 : d.getQuantity();
+                        if (qty <= 0) continue;
+
+                        Product p = productService.getById(pid)
+                                .orElseThrow(() -> new RuntimeException("Product not found: " + pid));
+
+                        boolean okStock = productService.decreaseStockIfEnough(con, pid, qty);
+                        if (!okStock) {
+                            // Out of stock: cancel + refund in the same transaction
+                            boolean st = orderDao.updateStatus(orderId, OrderStatus.CANCELLED.name());
+                            if (!st) throw new RuntimeException("Failed to cancel order after out-of-stock");
+
+                            walletService.topUp(current.getCustomerId(), current.getTotalAmount(),
+                                    "Refund for out-of-stock order: " + orderId + " (" + p.getProductName() + ")");
+
+                            con.commit();
+                            return OrderStatus.CANCELLED;
+                        }
+                    }
+
+                    // 2) If stock ok: advance status
+                    boolean ok = orderDao.updateStatus(orderId, next.name());
+                    if (!ok) throw new RuntimeException("Failed to update order status");
+                    con.commit();
+                    return next;
+                } catch (RuntimeException ex) {
+                    con.rollback();
+                    throw ex;
+                } catch (SQLException ex) {
+                    con.rollback();
+                    throw new RuntimeException("Failed to accept order: " + ex.getMessage(), ex);
+                } finally {
+                    con.setAutoCommit(oldAutoCommit);
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException("Failed to accept order: " + e.getMessage(), e);
+            }
+        }
+
         boolean ok = orderDao.updateStatus(orderId, next.name());
         if (!ok) throw new RuntimeException("Failed to update order status");
         return next;
+    }
+
+    @Override
+    public void rejectOrderAndRefund(int orderId) {
+        // Must be PENDING to be rejected by staff
+        Order current = orderDao.findPendingForStaff().stream()
+                .filter(o -> orderId == o.getOrderId())
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Order not found or not updatable: " + orderId));
+
+        try (Connection con = db.getConnection()) {
+            boolean oldAutoCommit = con.getAutoCommit();
+            con.setAutoCommit(false);
+            try {
+                // IMPORTANT: keep atomicity by using the SAME connection for both steps.
+                if (walletService == null) {
+                    throw new IllegalStateException("WalletService is not configured");
+                }
+
+                // 1) Update order status to CANCEL (with this transaction)
+                // (OrderDao.updateStatus currently opens its own connection, so do inline SQL here)
+                String sql = "UPDATE orders SET status = ? WHERE order_id = ?";
+                try (java.sql.PreparedStatement ps = con.prepareStatement(sql)) {
+                    ps.setString(1, OrderStatus.CANCELLED.name());
+                    ps.setInt(2, orderId);
+                    int updated = ps.executeUpdate();
+                    if (updated <= 0) throw new RuntimeException("Failed to update order status to CANCELLED");
+                }
+
+                // 2) Refund to wallet (with this transaction)
+                // (WalletService.topUp opens its own connection, so do inline SQL + tx insert here)
+                String userId = current.getCustomerId();
+                BigDecimal amount = current.getTotalAmount() == null ? BigDecimal.ZERO : current.getTotalAmount();
+                if (amount.compareTo(BigDecimal.ZERO) > 0) {
+                    String addBalSql = "UPDATE users SET balance = balance + ? WHERE user_id = ?";
+                    try (java.sql.PreparedStatement ps = con.prepareStatement(addBalSql)) {
+                        ps.setBigDecimal(1, amount);
+                        ps.setString(2, userId);
+                        int okUser = ps.executeUpdate();
+                        if (okUser <= 0) throw new RuntimeException("Failed to refund wallet balance");
+                    }
+
+                    String insertTxSql = "INSERT INTO transactions(user_id, amount, transaction_type, description, created_at) VALUES(?, ?, ?, ?, ?)";
+                    try (java.sql.PreparedStatement ps = con.prepareStatement(insertTxSql)) {
+                        ps.setString(1, userId);
+                        ps.setBigDecimal(2, amount);
+                        ps.setString(3, "TOPUP");
+                        ps.setString(4, "Refund for rejected order: " + orderId);
+                        ps.setTimestamp(5, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
+                        ps.executeUpdate();
+                    }
+                }
+
+                con.commit();
+            } catch (RuntimeException ex) {
+                con.rollback();
+                throw ex;
+            } catch (SQLException ex) {
+                con.rollback();
+                throw new RuntimeException("Failed to reject order and refund: " + ex.getMessage(), ex);
+            } finally {
+                con.setAutoCommit(oldAutoCommit);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to reject order and refund: " + e.getMessage(), e);
+        }
     }
 
     @Override
@@ -139,7 +246,7 @@ public class OrderServiceImpl implements OrderService {
         List<Order> pending = orderDao.findPendingForStaff(); // already FIFO by ORDER BY order_time ASC
         int updated = 0;
         for (Order o : pending) {
-            if (o == null || o.getOrderId() == null || o.getOrderId().isBlank()) continue;
+            if (o == null) continue;
             if (o.getStatus() == null || !o.getStatus().isStaffUpdatable()) continue;
 
             OrderStatus next = o.getStatus().nextForStaff();
@@ -150,20 +257,13 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public Optional<Order> getLatestOrderOfCustomer(String customerId) {
-        if (customerId == null || customerId.isBlank()) return Optional.empty();
-        return orderDao.findLatestByCustomerId(customerId);
-    }
-
-    @Override
     public List<Order> getAllOrdersOfCustomer(String customerId) {
         if (customerId == null || customerId.isBlank()) return List.of();
         return orderDao.findAllByCustomerId(customerId);
     }
 
     @Override
-    public List<OrderDetail> getOrderDetails(String orderId) {
-        if (orderId == null || orderId.isBlank()) return List.of();
+    public List<OrderDetail> getOrderDetails(int orderId) {
         if (orderDetailDao == null) {
             throw new IllegalStateException("OrderDetailDao is not configured");
         }

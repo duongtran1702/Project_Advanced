@@ -8,6 +8,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,54 +24,58 @@ public class StatisticsDaoImpl implements StatisticsDao {
     }
 
     @Override
-    public Map<YearMonth, BigDecimal> sessionRevenueByMonth(int year) {
+    public Map<LocalDate, BigDecimal> sessionRevenueByDay(YearMonth month) {
         // bookings revenue recognized by actual_end_time when COMPLETED
-        //noinspection SqlDialectInspection,SqlNoDataSourceInspection
-        String sql = "SELECT YEAR(actual_end_time) y, MONTH(actual_end_time) m, SUM(total_fee) total " +
-                "FROM bookings WHERE status = 'COMPLETED' AND actual_end_time IS NOT NULL AND YEAR(actual_end_time) = ? " +
-                "GROUP BY YEAR(actual_end_time), MONTH(actual_end_time) ORDER BY m";
-        return queryYearMonthSum(sql, year);
+        String sql = "SELECT DATE(actual_end_time) d, SUM(total_fee) total " +
+                "FROM bookings WHERE status = 'COMPLETED' AND actual_end_time IS NOT NULL " +
+                "AND actual_end_time >= ? AND actual_end_time < ? " +
+                "GROUP BY DATE(actual_end_time) ORDER BY d";
+        return queryLocalDateSum(sql, month);
     }
 
     @Override
-    public Map<YearMonth, BigDecimal> fnbRevenueByMonth(int year) {
+    public Map<LocalDate, BigDecimal> fnbRevenueByDay(YearMonth month) {
         // orders revenue recognized by order_time when PAID
-        //noinspection SqlDialectInspection,SqlNoDataSourceInspection
-        String sql = "SELECT YEAR(order_time) y, MONTH(order_time) m, SUM(total_amount) total " +
-                "FROM orders WHERE status = 'PAID' AND YEAR(order_time) = ? " +
-                "GROUP BY YEAR(order_time), MONTH(order_time) ORDER BY m";
-        return queryYearMonthSum(sql, year);
+        String sql = "SELECT DATE(order_time) d, SUM(total_amount) total " +
+                "FROM orders WHERE status = 'PAID' " +
+                "AND order_time >= ? AND order_time < ? " +
+                "GROUP BY DATE(order_time) ORDER BY d";
+        return queryLocalDateSum(sql, month);
     }
 
     @Override
-    public Map<YearMonth, BigDecimal> topupByMonth(int year) {
-        //noinspection SqlDialectInspection,SqlNoDataSourceInspection
-        String sql = "SELECT YEAR(created_at) y, MONTH(created_at) m, SUM(amount) total " +
-                "FROM transactions WHERE transaction_type = 'TOPUP' AND YEAR(created_at) = ? " +
-                "GROUP BY YEAR(created_at), MONTH(created_at) ORDER BY m";
-        return queryYearMonthSum(sql, year);
+    public Map<LocalDate, BigDecimal> topupByDay(YearMonth month) {
+        String sql = "SELECT DATE(created_at) d, SUM(amount) total " +
+                "FROM transactions WHERE transaction_type = 'TOPUP' " +
+                "AND created_at >= ? AND created_at < ? " +
+                "GROUP BY DATE(created_at) ORDER BY d";
+        return queryLocalDateSum(sql, month);
     }
 
     @Override
-    public Map<YearMonth, BigDecimal> paymentByMonth(int year) {
-        //noinspection SqlDialectInspection,SqlNoDataSourceInspection
-        String sql = "SELECT YEAR(created_at) y, MONTH(created_at) m, SUM(amount) total " +
-                "FROM transactions WHERE transaction_type = 'PAYMENT' AND YEAR(created_at) = ? " +
-                "GROUP BY YEAR(created_at), MONTH(created_at) ORDER BY m";
-        return queryYearMonthSum(sql, year);
+    public Map<LocalDate, BigDecimal> paymentByDay(YearMonth month) {
+        String sql = "SELECT DATE(created_at) d, SUM(amount) total " +
+                "FROM transactions WHERE transaction_type = 'PAYMENT' " +
+                "AND created_at >= ? AND created_at < ? " +
+                "GROUP BY DATE(created_at) ORDER BY d";
+        return queryLocalDateSum(sql, month);
     }
 
-    private Map<YearMonth, BigDecimal> queryYearMonthSum(String sql, int year) {
-        Map<YearMonth, BigDecimal> map = new HashMap<>();
+    private Map<LocalDate, BigDecimal> queryLocalDateSum(String sql, YearMonth month) {
+        Objects.requireNonNull(month, "month must not be null");
+        Map<LocalDate, BigDecimal> map = new HashMap<>();
+        LocalDate start = month.atDay(1);
+        LocalDate endExclusive = month.plusMonths(1).atDay(1);
         try (Connection con = db.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setInt(1, year);
+            ps.setTimestamp(1, Timestamp.valueOf(start.atStartOfDay()));
+            ps.setTimestamp(2, Timestamp.valueOf(endExclusive.atStartOfDay()));
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    int y = rs.getInt("y");
-                    int m = rs.getInt("m");
+                    java.sql.Date d = rs.getDate("d");
                     BigDecimal total = rs.getBigDecimal("total");
-                    map.put(YearMonth.of(y, m), total == null ? BigDecimal.ZERO : total);
+                    if (d == null) continue;
+                    map.put(d.toLocalDate(), total == null ? BigDecimal.ZERO : total);
                 }
             }
         } catch (SQLException e) {

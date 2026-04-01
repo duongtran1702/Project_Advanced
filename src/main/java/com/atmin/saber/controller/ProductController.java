@@ -7,7 +7,6 @@ import com.atmin.saber.service.ProductService;
 import com.atmin.saber.service.impl.ProductServiceImpl;
 import com.atmin.saber.util.DBConnection;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 import static com.atmin.saber.controller.PcController.safeShort;
@@ -36,14 +35,7 @@ public class ProductController {
                 return;
             }
 
-            System.out.println("\n+------+----------------------+----------------------+---------------+--------------+----------+");
-            System.out.printf("| %-4s | %-20s | %-20s | %-13s | %-12s | %-8s |%n", "ID", "NAME", "DESCRIPTION", "PRICE", "STOCK", "CATEGORY");
-            System.out.println("+------+----------------------+----------------------+---------------+--------------+----------+");
-
-            for (Product product : products) {
-                printProductRow(product);
-            }
-            System.out.println("+------+----------------------+----------------------+---------------+--------------+----------+");
+            printProductListAsTable(products);
 
         } catch (RuntimeException ex) {
             System.out.println("\tFailed to load product list: " + ex.getMessage());
@@ -57,7 +49,8 @@ public class ProductController {
                 return;
             }
 
-            Product product = new Product(0, input.productName(), input.description(), input.price(), input.stockQuantity(), input.category());
+            Product product = new Product(0, input.productName(), input.description(), input.price(),
+                    input.stockQuantity(), input.category());
             productService.add(product);
             System.out.println("\tProduct added successfully!");
 
@@ -78,12 +71,25 @@ public class ProductController {
                 return;
             }
 
+            boolean hasUpdate = !isBlank(input.newName())
+                    || !isBlank(input.newDescription())
+                    || input.newPrice() != null
+                    || input.newStockQuantity() != null
+                    || input.newCategory() != null;
+
+            if (!hasUpdate) {
+                System.out.println("\tNo fields were updated. Keeping old data.");
+                return;
+            }
+
             Product updated = new Product();
             updated.setId(oldProduct.getId());
             updated.setProductName(isBlank(input.newName()) ? oldProduct.getProductName() : input.newName().trim());
-            updated.setDescription(isBlank(input.newDescription()) ? oldProduct.getDescription() : input.newDescription().trim());
-            updated.setPrice(isValidPrice(input.newPrice()) ? input.newPrice() : oldProduct.getPrice());
-            updated.setStockQuantity(isValidStock(input.newStockQuantity()) ? input.newStockQuantity() : oldProduct.getStockQuantity());
+            updated.setDescription(
+                    isBlank(input.newDescription()) ? oldProduct.getDescription() : input.newDescription().trim());
+            updated.setPrice(input.newPrice() != null ? input.newPrice() : oldProduct.getPrice());
+            updated.setStockQuantity(
+                    input.newStockQuantity() != null ? input.newStockQuantity() : oldProduct.getStockQuantity());
             updated.setCategory(input.newCategory() != null ? input.newCategory() : oldProduct.getCategory());
 
             productService.update(updated);
@@ -120,14 +126,6 @@ public class ProductController {
         }
     }
 
-    private static boolean isValidPrice(BigDecimal price) {
-        return price != null && price.compareTo(BigDecimal.ZERO) > 0;
-    }
-
-    private static boolean isValidStock(Integer stock) {
-        return stock != null && stock >= 0;
-    }
-
     private static boolean isBlank(String s) {
         return s == null || s.trim().isEmpty();
     }
@@ -136,12 +134,34 @@ public class ProductController {
         return s != null && s.trim().equalsIgnoreCase("Y");
     }
 
+    private static void printProductTableHeader() {
+        System.out.println(
+                "\n+------+----------------------+----------------------+---------------+--------------+----------+");
+        System.out.printf("| %-4s | %-20s | %-20s | %-13s | %-12s | %-8s |%n", "ID", "NAME", "DESCRIPTION", "PRICE",
+                "STOCK", "CATEGORY");
+        System.out.println(
+                "+------+----------------------+----------------------+---------------+--------------+----------+");
+    }
+
+    private static void printProductTableFooter() {
+        System.out.println(
+                "+------+----------------------+----------------------+---------------+--------------+----------+");
+    }
+
     public static void printProductAsTable(Product product) {
-        System.out.println("\n+------+----------------------+----------------------+---------------+--------------+----------+");
-        System.out.printf("| %-4s | %-20s | %-20s | %-13s | %-12s | %-8s |%n", "ID", "NAME", "DESCRIPTION", "PRICE", "STOCK", "CATEGORY");
-        System.out.println("+------+----------------------+----------------------+---------------+--------------+----------+");
+        printProductTableHeader();
         printProductRow(product);
-        System.out.println("+------+----------------------+----------------------+---------------+--------------+----------+");
+        printProductTableFooter();
+    }
+
+    public static void printProductListAsTable(List<Product> products) {
+        if (products == null || products.isEmpty())
+            return;
+        printProductTableHeader();
+        for (Product product : products) {
+            printProductRow(product);
+        }
+        printProductTableFooter();
     }
 
     private static void printProductRow(Product product) {

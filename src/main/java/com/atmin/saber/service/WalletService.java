@@ -1,9 +1,6 @@
 package com.atmin.saber.service;
 
-import com.atmin.saber.model.Transaction;
-
 import java.math.BigDecimal;
-import java.util.List;
 
 public interface WalletService {
     BigDecimal getBalance(String userId);
@@ -20,6 +17,5 @@ public interface WalletService {
      */
     boolean charge(String userId, BigDecimal amount, String description);
 
-    List<Transaction> getRecentTransactions(String userId, int limit);
 }
 

@@ -16,47 +16,32 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public Optional<User> login(String username, String password) {
-        if (username == null || username.trim().isEmpty() || password == null) {
-            return Optional.empty();
-        }
-        Optional<User> userOpt = userDao.findByUsernameWithRoles(username);
-        if (userOpt.isEmpty()) {
-            return Optional.empty();
-        }
+        if (isBlank(username) || isBlank(password)) return Optional.empty();
 
-        User user = userOpt.get();
-        boolean ok = HashUtil.verifyPassword(password, user.getPasswordHash());
-        return ok ? Optional.of(user) : Optional.empty();
+        return userDao.findByUsernameWithRoles(username.trim())
+                .filter(user -> HashUtil.verifyPassword(password, user.getPasswordHash()));
     }
 
     @Override
     public Optional<User> register(String username, String password, String phone, String fullname) {
-        if (username == null || username.trim().isEmpty() || password == null || password.isEmpty()) {
-            return Optional.empty();
-        }
-
-        if (password.trim().length() < 6) {
-            return Optional.empty();
-        }
-
-        if (fullname == null || fullname.trim().isEmpty() || phone == null || phone.trim().isEmpty()) {
+        if (isBlank(username) || isBlank(password) || isBlank(phone) || isBlank(fullname) || password.trim().length() < 6) {
             return Optional.empty();
         }
 
         String normalizedUsername = username.trim();
-        if (userDao.existsByUsername(normalizedUsername)) {
-            return Optional.empty();
-        }
+        if (userDao.existsByUsername(normalizedUsername)) return Optional.empty();
 
         String normalizedPhone = phone.trim();
-        if (userDao.existsByPhone(normalizedPhone)) {
-            return Optional.empty();
-        }
+        if (userDao.existsByPhone(normalizedPhone)) return Optional.empty();
 
         String passwordHash = HashUtil.hashPassword(password);
-        String userId = userDao.createUser(normalizedUsername, passwordHash, normalizedPhone, fullname);
+        String userId = userDao.createUser(normalizedUsername, passwordHash, normalizedPhone, fullname.trim());
         userDao.assignDefaultCustomerRole(userId);
         return userDao.findByUsernameWithRoles(normalizedUsername);
+    }
+
+    private boolean isBlank(String str) {
+        return str == null || str.trim().isEmpty();
     }
 
     @Override

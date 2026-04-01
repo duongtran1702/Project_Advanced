@@ -11,15 +11,11 @@ public interface ProductService {
 
     Optional<Product> getById(int id);
 
-    boolean existsById(int id);
-
     void add(Product product);
 
     void update(Product product);
 
     void delete(int id);
-
-    boolean decreaseStockIfEnough(int productId, int quantity);
 
     boolean decreaseStockIfEnough(Connection con, int productId, int quantity);
 }

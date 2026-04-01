@@ -3,16 +3,16 @@ package com.atmin.saber.model;
 import java.math.BigDecimal;
 
 public class OrderDetail {
-    private String detailId;
-    private String orderId;
-    private Integer id;
+    private int detailId;
+    private int orderId;
+    private int id;
     private Integer quantity;
     private BigDecimal unitPrice;
 
     public OrderDetail() {
     }
 
-    public OrderDetail(String detailId, String orderId, Integer id, Integer quantity, BigDecimal unitPrice) {
+    public OrderDetail(int detailId, int orderId, int id, Integer quantity, BigDecimal unitPrice) {
         this.detailId = detailId;
         this.orderId = orderId;
         this.id = id;
@@ -20,27 +20,27 @@ public class OrderDetail {
         this.unitPrice = unitPrice;
     }
 
-    public String getDetailId() {
+    public int getDetailId() {
         return detailId;
     }
 
-    public void setDetailId(String detailId) {
+    public void setDetailId(int detailId) {
         this.detailId = detailId;
     }
 
-    public String getOrderId() {
+    public int getOrderId() {
         return orderId;
     }
 
-    public void setOrderId(String orderId) {
+    public void setOrderId(int orderId) {
         this.orderId = orderId;
     }
 
-    public Integer getId() {
+    public int getId() {
         return id;
     }
 
-    public void setId(Integer id) {
+    public void setId(int id) {
         this.id = id;
     }
 
@@ -71,4 +71,3 @@ public class OrderDetail {
                 '}';
     }
 }
-

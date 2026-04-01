@@ -6,7 +6,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public class Order {
-    private String orderId;
+    private int orderId;
     private String bookingId; // nullable
     // DB uses composite FK to bookings
     private String bookingCustomerId; // nullable
@@ -21,7 +21,7 @@ public class Order {
     public Order() {
     }
 
-    public Order(String orderId, String bookingId, String customerId, LocalDateTime orderTime, OrderStatus status,
+    public Order(int orderId, String bookingId, String customerId, LocalDateTime orderTime, OrderStatus status,
                  BigDecimal totalAmount, String discountCode) {
         this.orderId = orderId;
         this.bookingId = bookingId;
@@ -32,11 +32,11 @@ public class Order {
         this.discountCode = discountCode;
     }
 
-    public String getOrderId() {
+    public int getOrderId() {
         return orderId;
     }
 
-    public void setOrderId(String orderId) {
+    public void setOrderId(int orderId) {
         this.orderId = orderId;
     }
 
@@ -125,4 +125,3 @@ public class Order {
                 '}';
     }
 }
-

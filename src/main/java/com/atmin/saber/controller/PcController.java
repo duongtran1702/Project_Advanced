@@ -33,18 +33,7 @@ public class PcController {
                 return;
             }
 
-            System.out.println("\n+------+----------------------+----------------------+--------------+");
-            System.out.printf("| %-4s | %-20s | %-20s | %-12s |%n", "ID", "PC NAME", "ROOM NAME", "STATUS");
-            System.out.println("+------+----------------------+----------------------+--------------+");
-
-            for (PC pc : pcs) {
-                System.out.printf("| %-4d | %-20s | %-20s | %-12s |%n",
-                        pc.getPcId(),
-                        safeShort(pc.getPcName()),
-                        safeShort(pc.getRoomName()),
-                        pc.getStatus() == null ? "" : pc.getStatus().name());
-            }
-            System.out.println("+------+----------------------+----------------------+--------------+");
+            printPcListAsTable(pcs);
 
         } catch (RuntimeException ex) {
             System.out.println("\tFailed to load PC list: " + ex.getMessage());
@@ -59,24 +48,7 @@ public class PcController {
                 return;
             }
 
-            System.out.println("\n+------+----------------------+----------------------+--------------+----------------------+--------+----------------------+" );
-            System.out.printf("| %-4s | %-20s | %-20s | %-12s | %-20s | %-6s | %-20s |%n",
-                    "ID", "PC NAME", "ROOM NAME", "STATUS", "CPU", "RAM", "GPU");
-            System.out.println("+------+----------------------+----------------------+--------------+----------------------+--------+----------------------+" );
-            for (PC pc : pcs) {
-                String cpu = pc.getSpec() == null ? "" : safeShort(pc.getSpec().getCpu());
-                String ram = pc.getSpec() == null || pc.getSpec().getRamGb() == null ? "" : (pc.getSpec().getRamGb() + "GB");
-                String gpu = pc.getSpec() == null ? "" : safeShort(pc.getSpec().getGpu());
-                System.out.printf("| %-4d | %-20s | %-20s | %-12s | %-20s | %-6s | %-20s |%n",
-                        pc.getPcId(),
-                        safeShort(pc.getPcName()),
-                        safeShort(pc.getRoomName()),
-                        pc.getStatus() == null ? "" : pc.getStatus().name(),
-                        cpu,
-                        ram,
-                        gpu);
-            }
-            System.out.println("+------+----------------------+----------------------+--------------+----------------------+--------+----------------------+" );
+            printPcListAsTable(pcs);
         } catch (RuntimeException ex) {
             System.out.println("\tFailed to load PCs: " + ex.getMessage());
         }
@@ -88,7 +60,7 @@ public class PcController {
                 System.out.println("\tInvalid input for adding a PC.");
                 return;
             }
-            pcService.add(new PC(0, input.pcName(), input.roomName(), input.status()));
+            pcService.add(new PC(0, input.pcName(), null, input.roomName(), input.status(), input.configuration()));
             System.out.println("\tPC added successfully!");
         } catch (RuntimeException ex) {
             System.out.println("\tFailed to add PC: " + ex.getMessage());
@@ -106,11 +78,22 @@ public class PcController {
                 return;
             }
 
+            boolean hasUpdate = !isBlank(input.newName())
+                    || !isBlank(input.newRoomName())
+                    || input.newStatus() != null
+                    || !isBlank(input.newConfiguration());
+
+            if (!hasUpdate) {
+                System.out.println("\tNo fields were updated. Keeping old data.");
+                return;
+            }
+
             PC updated = new PC();
             updated.setPcId(oldPc.getPcId());
             updated.setPcName(isBlank(input.newName()) ? oldPc.getPcName() : input.newName().trim());
             updated.setRoomName(isBlank(input.newRoomName()) ? oldPc.getRoomName() : input.newRoomName().trim());
             updated.setStatus(input.newStatus() == null ? oldPc.getStatus() : input.newStatus());
+            updated.setConfiguration(isBlank(input.newConfiguration()) ? oldPc.getConfiguration() : input.newConfiguration().trim());
 
             pcService.update(updated);
             System.out.println("\tUpdated successfully!");
@@ -150,22 +133,49 @@ public class PcController {
         return s != null && s.trim().equalsIgnoreCase("Y");
     }
 
-    public static void printPcAsTable(PC pc) {
-        System.out.println("\n+------+----------------------+----------------------+--------------+");
-        System.out.printf("| %-4s | %-20s | %-20s | %-12s |%n", "ID", "PC NAME", "ROOM NAME", "STATUS");
-        System.out.println("+------+----------------------+----------------------+--------------+");
-        System.out.printf("| %-4d | %-20s | %-20s | %-12s |%n",
+    private static void printPcTableHeader() {
+        System.out.println("\n+------+----------------------+----------------------+--------------+--------------------------------------------------+");
+        System.out.printf("| %-4s | %-20s | %-20s | %-12s | %-48s |%n", "ID", "PC NAME", "ROOM NAME", "STATUS", "CONFIGURATION");
+        System.out.println("+------+----------------------+----------------------+--------------+--------------------------------------------------+");
+    }
+
+    private static void printPcTableFooter() {
+        System.out.println("+------+----------------------+----------------------+--------------+--------------------------------------------------+");
+    }
+
+    private static void printPcRow(PC pc) {
+        System.out.printf("| %-4d | %-20s | %-20s | %-12s | %-48s |%n",
                 pc.getPcId(),
-                safeShort(pc.getPcName()),
-                safeShort(pc.getRoomName()),
-                pc.getStatus() == null ? "" : pc.getStatus().name());
-        System.out.println("+------+----------------------+----------------------+--------------+");
+                safeLength(pc.getPcName(), 20),
+                safeLength(pc.getRoomName(), 20),
+                pc.getStatus() == null ? "" : pc.getStatus().name(),
+                safeLength(pc.getConfiguration(), 48));
+    }
+
+    public static void printPcAsTable(PC pc) {
+        printPcTableHeader();
+        printPcRow(pc);
+        printPcTableFooter();
+    }
+
+    public static void printPcListAsTable(List<PC> pcs) {
+        if (pcs == null || pcs.isEmpty()) return;
+        printPcTableHeader();
+        for (PC pc : pcs) {
+            printPcRow(pc);
+        }
+        printPcTableFooter();
+    }
+
+    public static String safeLength(String s, int maxLen) {
+        if (s == null) return "";
+        String trimmed = s.trim();
+        if (trimmed.length() <= maxLen) return trimmed;
+        return trimmed.substring(0, maxLen - 3) + "...";
     }
 
     public static String safeShort(String s) {
-        if (s == null) return "";
-        if (s.length() <= 20) return s;
-        return s.substring(0, 17) + "...";
+        return safeLength(s, 20);
     }
 }
 

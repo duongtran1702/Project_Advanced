@@ -38,10 +38,7 @@ public class AutoStopServiceImpl implements AutoStopService {
         scheduler.scheduleAtFixedRate(this::tickSafe, 60, 60, TimeUnit.SECONDS);
     }
 
-    @Override
-    public void stop() {
-        scheduler.shutdownNow();
-    }
+
 
     private void tickSafe() {
         try {

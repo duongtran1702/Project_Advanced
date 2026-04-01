@@ -20,10 +20,10 @@ public class PcManagementMenu {
 
     private static final RoomDao roomDao = new RoomDaoImpl(DBConnection.getInstance());
 
-    public record AddPcInput(String pcName, String roomName, PCStatus status) {
+    public record AddPcInput(String pcName, String roomName, PCStatus status, String configuration) {
     }
 
-    public record EditPcInput(int pcId, String newName, String newRoomName, PCStatus newStatus) {
+    public record EditPcInput(int pcId, String newName, String newRoomName, PCStatus newStatus, String newConfiguration) {
     }
 
     public record DeletePcInput(int pcId, String confirm) {
@@ -164,7 +164,9 @@ public class PcManagementMenu {
         String pcName = ConsoleInput.readNonEmpty(scanner, "\tPC Name: ", "\tPC Name cannot be empty.").trim();
         String roomName = promptRoomName(scanner, false);
         PCStatus status = promptStatus(scanner, false);
-        return new AddPcInput(pcName, roomName, status);
+        System.out.print("\tConfiguration (e.g. i5 | 16GB | 3060): ");
+        String configuration = scanner.nextLine().trim();
+        return new AddPcInput(pcName, roomName, status, configuration.isEmpty() ? null : configuration);
     }
 
     private static EditPcInput promptEditPc(Scanner scanner) {
@@ -175,7 +177,7 @@ public class PcManagementMenu {
         PC currentPc = pcController.getPcService().getById(pcId).orElse(null);
         if (currentPc == null || currentPc.getStatus() == PCStatus.DELETED) {
             System.out.println("\tError: PC ID does not exist.");
-            return new EditPcInput(pcId, null, null, null);
+            return new EditPcInput(pcId, null, null, null, null);
         }
 
         System.out.println("\tCurrent PC Information:");
@@ -186,7 +188,9 @@ public class PcManagementMenu {
         String newName = scanner.nextLine().trim();
         String newRoomName = promptRoomName(scanner, true);
         PCStatus newStatus = promptStatus(scanner, true);
-        return new EditPcInput(pcId, newName, newRoomName, newStatus);
+        System.out.print("\tNew Configuration (Enter to keep current): ");
+        String newConfiguration = scanner.nextLine().trim();
+        return new EditPcInput(pcId, newName, newRoomName, newStatus, newConfiguration);
     }
 
     private static DeletePcInput promptDeletePc(Scanner scanner) {

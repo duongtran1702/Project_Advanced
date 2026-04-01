@@ -27,11 +27,6 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public boolean existsById(int id) {
-        return productDao.existsById(id);
-    }
-
-    @Override
     public void add(Product product) {
         productDao.insert(product);
     }
@@ -44,11 +39,6 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public void delete(int id) {
         productDao.delete(id);
-    }
-
-    @Override
-    public boolean decreaseStockIfEnough(int productId, int quantity) {
-        return productDao.decreaseStockIfEnough(productId, quantity);
     }
 
     @Override

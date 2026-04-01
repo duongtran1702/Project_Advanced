@@ -11,7 +11,6 @@ import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Objects;
 
 public class WalletServiceImpl implements WalletService {
@@ -106,10 +105,5 @@ public class WalletServiceImpl implements WalletService {
         }
     }
 
-    @Override
-    public List<Transaction> getRecentTransactions(String userId, int limit) {
-        if (userId == null || userId.isBlank()) return List.of();
-        return transactionDao.findByUserId(userId, limit);
-    }
 }
 

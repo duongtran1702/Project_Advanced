@@ -1,6 +1,5 @@
 package com.atmin.saber;
 
-
 import com.atmin.saber.controller.AuthController;
 import com.atmin.saber.dao.UserDao;
 import com.atmin.saber.dao.impl.BookingDaoImpl;
@@ -24,10 +23,12 @@ public class Main {
 	public static void main(String[] args) {
 		DBConnection db = DBConnection.getInstance();
 
-		// Background worker: auto-stop ACTIVE sessions when wallet can't pay next minute (Policy B)
+		// Background worker: auto-stop ACTIVE sessions when wallet can't pay next
+		// minute (Policy B)
 		try {
 			WalletService walletService = new WalletServiceImpl(new UserDaoImpl(db), new TransactionDaoImpl(db), db);
-			SessionBillingService sessionBillingService = new SessionBillingServiceImpl(new BookingDaoImpl(db), new PcDaoImpl(db), walletService);
+			SessionBillingService sessionBillingService = new SessionBillingServiceImpl(new BookingDaoImpl(db),
+					new PcDaoImpl(db), walletService);
 			AutoStopService autoStopService = new AutoStopServiceImpl(new BookingDaoImpl(db), sessionBillingService);
 			autoStopService.start();
 		} catch (RuntimeException ex) {
@@ -37,8 +38,6 @@ public class Main {
 		AuthService authService = new AuthServiceImpl(userDao);
 		Scanner sc = new Scanner(System.in);
 
-		new AuthController(authService,sc).start();
+		new AuthController(authService, sc).start();
 	}
 }
-
-`

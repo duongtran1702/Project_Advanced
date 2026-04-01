@@ -31,11 +31,6 @@ public class PcServiceImpl implements PcService {
     }
 
     @Override
-    public boolean existsById(int pcId) {
-        return pcDao.existsById(pcId);
-    }
-
-    @Override
     public void add(PC pc) {
         pcDao.insert(pc);
     }

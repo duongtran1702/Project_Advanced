@@ -1,16 +1,16 @@
 package com.atmin.saber.dao;
 
 import java.math.BigDecimal;
-import java.time.YearMonth;
 import java.util.Map;
 
 public interface StatisticsDao {
-    Map<YearMonth, BigDecimal> sessionRevenueByMonth(int year);
 
-    Map<YearMonth, BigDecimal> fnbRevenueByMonth(int year);
+    Map<java.time.LocalDate, BigDecimal> sessionRevenueByDay(java.time.YearMonth month);
 
-    Map<YearMonth, BigDecimal> topupByMonth(int year);
+    Map<java.time.LocalDate, BigDecimal> fnbRevenueByDay(java.time.YearMonth month);
 
-    Map<YearMonth, BigDecimal> paymentByMonth(int year);
+    Map<java.time.LocalDate, BigDecimal> topupByDay(java.time.YearMonth month);
+
+    Map<java.time.LocalDate, BigDecimal> paymentByDay(java.time.YearMonth month);
 }
 

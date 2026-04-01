@@ -4,13 +4,12 @@ import com.atmin.saber.dao.StatisticsDao;
 import com.atmin.saber.service.StatisticsService;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 public class StatisticsServiceImpl implements StatisticsService {
 
@@ -21,35 +20,24 @@ public class StatisticsServiceImpl implements StatisticsService {
     }
 
     @Override
-    public List<MonthlyRow> monthlyReport(int year) {
-        Map<YearMonth, BigDecimal> session = statisticsDao.sessionRevenueByMonth(year);
-        Map<YearMonth, BigDecimal> fnb = statisticsDao.fnbRevenueByMonth(year);
-        Map<YearMonth, BigDecimal> topup = statisticsDao.topupByMonth(year);
-        Map<YearMonth, BigDecimal> payment = statisticsDao.paymentByMonth(year);
+    public List<DailyRow> dailyReport(YearMonth month) {
+        Objects.requireNonNull(month, "month must not be null");
 
-        Set<YearMonth> months = new HashSet<>();
-        months.addAll(session.keySet());
-        months.addAll(fnb.keySet());
-        months.addAll(topup.keySet());
-        months.addAll(payment.keySet());
+        Map<LocalDate, BigDecimal> session = statisticsDao.sessionRevenueByDay(month);
+        Map<LocalDate, BigDecimal> fnb = statisticsDao.fnbRevenueByDay(month);
+        Map<LocalDate, BigDecimal> topup = statisticsDao.topupByDay(month);
+        Map<LocalDate, BigDecimal> payment = statisticsDao.paymentByDay(month);
 
-        // Always show all 12 months for requested year
-        for (int m = 1; m <= 12; m++) {
-            months.add(YearMonth.of(year, m));
-        }
-
-        List<YearMonth> sorted = new ArrayList<>(months);
-        sorted.sort(YearMonth::compareTo);
-
-        List<MonthlyRow> rows = new ArrayList<>();
-        for (YearMonth ym : sorted) {
-            if (ym.getYear() != year) continue;
-            rows.add(new MonthlyRow(
-                    ym,
-                    session.getOrDefault(ym, BigDecimal.ZERO),
-                    fnb.getOrDefault(ym, BigDecimal.ZERO),
-                    topup.getOrDefault(ym, BigDecimal.ZERO),
-                    payment.getOrDefault(ym, BigDecimal.ZERO)
+        List<DailyRow> rows = new ArrayList<>();
+        int days = month.lengthOfMonth();
+        for (int d = 1; d <= days; d++) {
+            LocalDate date = month.atDay(d);
+            rows.add(new DailyRow(
+                    date,
+                    session.getOrDefault(date, BigDecimal.ZERO),
+                    fnb.getOrDefault(date, BigDecimal.ZERO),
+                    topup.getOrDefault(date, BigDecimal.ZERO),
+                    payment.getOrDefault(date, BigDecimal.ZERO)
             ));
         }
         return rows;

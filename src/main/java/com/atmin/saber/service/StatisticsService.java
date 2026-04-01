@@ -12,6 +12,14 @@ public interface StatisticsService {
                       java.math.BigDecimal payment) {
     }
 
-    List<MonthlyRow> monthlyReport(int year);
+    record DailyRow(java.time.LocalDate date,
+                    java.math.BigDecimal sessionRevenue,
+                    java.math.BigDecimal fnbRevenue,
+                    java.math.BigDecimal topup,
+                    java.math.BigDecimal payment) {
+    }
+
+    /** Daily report for a specific month (all days in that month). */
+    List<DailyRow> dailyReport(YearMonth month);
 }
 

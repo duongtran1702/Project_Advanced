@@ -16,7 +16,6 @@ CREATE TABLE users
 );
 
 -- 1.1 roles
--- roles: danh mục quyền (một user có thể có nhiều role)
 CREATE TABLE roles
 (
     role_id   INT PRIMARY KEY AUTO_INCREMENT,
@@ -36,7 +35,6 @@ CREATE TABLE user_roles
 );
 
 -- 2. rooms
--- rooms: khu vực/phòng máy, quyết định giá/giờ
 CREATE TABLE rooms
 (
     room_id    INT AUTO_INCREMENT PRIMARY KEY,
@@ -45,38 +43,18 @@ CREATE TABLE rooms
     type       ENUM ('standard', 'vip', 'stream')
 );
 
--- 3. pcs
--- pcs: thông tin máy trạm
--- status: AVAILABLE / IN_USE / MAINTENANCE / BOOKED
+-- 3. pcs (Đã thêm configuration, bỏ pc_specs)
 CREATE TABLE pcs
 (
-    pc_id   INT PRIMARY KEY AUTO_INCREMENT,
-    pc_name VARCHAR(100)                                                 NOT NULL,
-    zone_id INT                                                          NOT NULL,
-    status  ENUM ('AVAILABLE','IN_USE','MAINTENANCE','BOOKED','DELETED') NOT NULL DEFAULT 'AVAILABLE',
+    pc_id         INT PRIMARY KEY AUTO_INCREMENT,
+    pc_name       VARCHAR(100)                                                 NOT NULL,
+    zone_id       INT                                                          NOT NULL,
+    status        ENUM ('AVAILABLE','IN_USE','MAINTENANCE','BOOKED','DELETED') NOT NULL DEFAULT 'AVAILABLE',
+    configuration VARCHAR(255)                                                 NULL,
     FOREIGN KEY (zone_id) REFERENCES rooms (room_id)
-
-);
-
--- 3.1 pc_specs
--- pc_specs: cấu hình phần cứng cho từng máy (quan hệ 1-1 với pcs)
-CREATE TABLE pc_specs
-(
-    pc_id       INT PRIMARY KEY,
-    cpu         VARCHAR(100) NULL,
-    ram_gb      INT          NULL,
-    gpu         VARCHAR(100) NULL,
-    storage_gb  INT          NULL,
-    monitor_hz  INT          NULL,
-    os          VARCHAR(100) NULL,
-    notes       VARCHAR(255) NULL,
-    updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (pc_id) REFERENCES pcs (pc_id) ON DELETE CASCADE
 );
 
 -- 4. products
--- products: đồ ăn/nước/thẻ nạp...
--- unit price hiện tại nằm ở products.price; giá tại thời điểm mua nằm ở order_details.unit_price
 CREATE TABLE products
 (
     id             INT PRIMARY KEY                 AUTO_INCREMENT,
@@ -88,9 +66,6 @@ CREATE TABLE products
 );
 
 -- 5. bookings
--- bookings: phiên sử dụng máy
--- PK ghép (customer_id, pc_id, start_time) để đảm bảo không trùng phiên bắt đầu
--- Lưu ý: vì PK ghép nên các bảng muốn tham chiếu booking phải mang đủ 3 cột khóa
 CREATE TABLE bookings
 (
     customer_id       CHAR(36)                                          NOT NULL,
@@ -109,17 +84,15 @@ CREATE TABLE bookings
 );
 
 -- 6. orders
--- orders: hóa đơn đồ ăn/nước
--- booking_* nullable: hóa đơn có thể gắn với 1 phiên chơi hoặc không
 CREATE TABLE orders
 (
-    order_id            CHAR(36) PRIMARY KEY                                  DEFAULT (UUID()),
+    order_id            INT PRIMARY KEY AUTO_INCREMENT,
     booking_customer_id CHAR(36)                                     NULL,
     booking_pc_id       INT                                          NULL,
     booking_start_time  DATETIME                                     NULL,
     customer_id         CHAR(36)                                     NOT NULL,
     order_time          DATETIME                                     NOT NULL,
-    status              ENUM ('PENDING','PREPARING','SERVED','PAID') NOT NULL DEFAULT 'PENDING',
+    status              ENUM ('PENDING','COMPLETED','PAID','CANCELLED') NOT NULL DEFAULT 'PENDING',
     total_amount        DECIMAL(15, 2)                               NOT NULL DEFAULT 0.00,
     discount_code       VARCHAR(50)                                  NULL,
     FOREIGN KEY (booking_customer_id, booking_pc_id, booking_start_time)
@@ -131,12 +104,10 @@ CREATE TABLE orders
 );
 
 -- 7. order_details
--- order_details: chi tiết hóa đơn
--- ON DELETE CASCADE theo order_id: xóa order thì chi tiết tự xóa theo
 CREATE TABLE order_details
 (
-    detail_id  CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    order_id   CHAR(36)       NOT NULL,
+    detail_id  INT PRIMARY KEY AUTO_INCREMENT,
+    order_id   INT            NOT NULL,
     id         INT            NOT NULL,
     quantity   INT            NOT NULL,
     unit_price DECIMAL(15, 2) NOT NULL,
@@ -147,8 +118,6 @@ CREATE TABLE order_details
 );
 
 -- 8. transactions
--- transactions: lịch sử giao dịch ví
--- amount: số dương; transaction_type phân biệt DEPOSIT/PAYMENT/REFUND
 CREATE TABLE transactions
 (
     transaction_id   INT PRIMARY KEY AUTO_INCREMENT,
@@ -163,11 +132,12 @@ CREATE TABLE transactions
     INDEX idx_transactions_created (created_at)
 );
 
--- Role mặc định khi user tự đăng ký: CUSTOMER
+-- ==========================================
+-- ĐỔ DỮ LIỆU MẪU (SEED DATA)
+-- ==========================================
+
 INSERT IGNORE INTO roles(role_name)
-VALUES ('ADMIN'),
-       ('STAFF'),
-       ('CUSTOMER');
+VALUES ('ADMIN'), ('STAFF'), ('CUSTOMER');
 
 INSERT INTO rooms(room_name, base_price, type)
 VALUES ('atmin1', 10000.00, 'standard'),
@@ -177,70 +147,33 @@ VALUES ('atmin1', 10000.00, 'standard'),
        ('atmin5', 20000.00, 'vip'),
        ('atmin6', 30000.00, 'stream');
 
--- Seed PCs (manual): mỗi phòng 2 máy.
--- Bạn có thể đổi tên pc_name thoải mái ở đây.
-INSERT INTO pcs(pc_name, zone_id, status)
-VALUES ('PC01', (SELECT room_id FROM rooms WHERE room_name = 'atmin1' LIMIT 1), 'AVAILABLE'),
-       ('PC02', (SELECT room_id FROM rooms WHERE room_name = 'atmin1' LIMIT 1), 'AVAILABLE'),
+INSERT INTO pcs(pc_name, zone_id, status, configuration)
+VALUES
+    ('PC01', (SELECT room_id FROM rooms WHERE room_name = 'atmin1' LIMIT 1), 'AVAILABLE', 'i5-12400F | 16GB | RTX 3060 | 144Hz'),
+    ('PC02', (SELECT room_id FROM rooms WHERE room_name = 'atmin1' LIMIT 1), 'AVAILABLE', 'i5-12400F | 16GB | RTX 3060 | 144Hz'),
 
-       ('PC03', (SELECT room_id FROM rooms WHERE room_name = 'atmin2' LIMIT 1), 'AVAILABLE'),
-       ('PC04', (SELECT room_id FROM rooms WHERE room_name = 'atmin2' LIMIT 1), 'AVAILABLE'),
+    ('PC03', (SELECT room_id FROM rooms WHERE room_name = 'atmin2' LIMIT 1), 'AVAILABLE', 'i7-13700K | 32GB | RTX 4070 | 240Hz'),
+    ('PC04', (SELECT room_id FROM rooms WHERE room_name = 'atmin2' LIMIT 1), 'AVAILABLE', 'i7-13700K | 32GB | RTX 4070 | 240Hz'),
 
-       ('PC05', (SELECT room_id FROM rooms WHERE room_name = 'atmin3' LIMIT 1), 'AVAILABLE'),
-       ('PC06', (SELECT room_id FROM rooms WHERE room_name = 'atmin3' LIMIT 1), 'AVAILABLE'),
+    ('PC05', (SELECT room_id FROM rooms WHERE room_name = 'atmin3' LIMIT 1), 'AVAILABLE', 'i9-14900K | 64GB | RTX 4090 | 360Hz'),
+    ('PC06', (SELECT room_id FROM rooms WHERE room_name = 'atmin3' LIMIT 1), 'AVAILABLE', 'i9-14900K | 64GB | RTX 4090 | 360Hz'),
 
-       ('PC07', (SELECT room_id FROM rooms WHERE room_name = 'atmin4' LIMIT 1), 'AVAILABLE'),
-       ('PC08', (SELECT room_id FROM rooms WHERE room_name = 'atmin4' LIMIT 1), 'AVAILABLE'),
+    ('PC07', (SELECT room_id FROM rooms WHERE room_name = 'atmin4' LIMIT 1), 'AVAILABLE', 'i5-12400F | 16GB | RTX 3060 | 144Hz'),
+    ('PC08', (SELECT room_id FROM rooms WHERE room_name = 'atmin4' LIMIT 1), 'AVAILABLE', 'i5-12400F | 16GB | RTX 3060 | 144Hz'),
 
-       ('PC09', (SELECT room_id FROM rooms WHERE room_name = 'atmin5' LIMIT 1), 'AVAILABLE'),
-       ('PC10', (SELECT room_id FROM rooms WHERE room_name = 'atmin5' LIMIT 1), 'AVAILABLE'),
+    ('PC09', (SELECT room_id FROM rooms WHERE room_name = 'atmin5' LIMIT 1), 'AVAILABLE', 'i7-13700K | 32GB | RTX 4070 | 240Hz'),
+    ('PC10', (SELECT room_id FROM rooms WHERE room_name = 'atmin5' LIMIT 1), 'AVAILABLE', 'i7-13700K | 32GB | RTX 4070 | 240Hz'),
 
-       ('PC11', (SELECT room_id FROM rooms WHERE room_name = 'atmin6' LIMIT 1), 'AVAILABLE'),
-       ('PC012', (SELECT room_id FROM rooms WHERE room_name = 'atmin6' LIMIT 1), 'AVAILABLE');
-
--- Seed PC specs (sample): bạn có thể chỉnh theo thực tế
-INSERT INTO pc_specs(pc_id, cpu, ram_gb, gpu, storage_gb, monitor_hz, os, notes)
-SELECT pc_id,
-       'Intel Core i5-12400F',
-       16,
-       'RTX 3060',
-       512,
-       144,
-       'Windows 11',
-       NULL
-FROM pcs;
+    ('PC11', (SELECT room_id FROM rooms WHERE room_name = 'atmin6' LIMIT 1), 'AVAILABLE', 'i9-14900K | 64GB | RTX 4090 | 360Hz'),
+    ('PC012', (SELECT room_id FROM rooms WHERE room_name = 'atmin6' LIMIT 1), 'AVAILABLE', 'i9-14900K | 64GB | RTX 4090 | 360Hz');
 
 INSERT INTO users(username, password_hash, phone, fullname, balance)
 VALUES ('admin', '$2a$12$N/q07apHWmd6kTvDbATnweoytjYUcCHqjgrBs/eSAiFmVxQ/QsQ4O', '0123456789', 'Administrator', 50000);
--- password plaintext: admin1702
 
 INSERT INTO user_roles(user_id, role_id)
-VALUES ((SELECT user_id FROM users WHERE username = 'admin' LIMIT 1),
-        (SELECT role_id FROM roles WHERE role_name = 'ADMIN' LIMIT 1));
-
-INSERT INTO user_roles(user_id, role_id)
-VALUES ((SELECT user_id FROM users WHERE username = 'admin' LIMIT 1),
-        (SELECT role_id FROM roles WHERE role_name = 'STAFF' LIMIT 1));
-
-INSERT INTO user_roles(user_id, role_id)
-VALUES ((SELECT user_id FROM users WHERE username = 'admin' LIMIT 1),
-        (SELECT role_id FROM roles WHERE role_name = 'CUSTOMER' LIMIT 1));
-
--- Quick checks (optional)
-SELECT *
-FROM users;
-SELECT *
-FROM roles;
-SELECT u.username, ur.role_id, r.role_name
-FROM users u
-         JOIN user_roles ur ON u.user_id = ur.user_id
-         JOIN roles r ON ur.role_id = r.role_id;
-
-SELECT *
-FROM rooms;
-SELECT *
-FROM pcs
-WHERE status != 'DELETED';
+VALUES ((SELECT user_id FROM users WHERE username = 'admin' LIMIT 1), (SELECT role_id FROM roles WHERE role_name = 'ADMIN' LIMIT 1)),
+       ((SELECT user_id FROM users WHERE username = 'admin' LIMIT 1), (SELECT role_id FROM roles WHERE role_name = 'STAFF' LIMIT 1)),
+       ((SELECT user_id FROM users WHERE username = 'admin' LIMIT 1), (SELECT role_id FROM roles WHERE role_name = 'CUSTOMER' LIMIT 1));
 
 INSERT INTO products(product_name, description, price, stock_quantity, category)
 VALUES
@@ -257,9 +190,5 @@ VALUES
     ('Thẻ Zing 100k', 'Thẻ nạp Zing 100.000đ', 100000.00, 18, 'CARD'),
     ('Thẻ LMHT 50k', 'Thẻ nạp Liên Minh Huyền Thoại', 50000.00, 35, 'CARD');
 
--- Display products summary
-select * from products;
-SELECT COUNT(*) as total_products FROM products;
-SELECT category, COUNT(*) as count FROM products GROUP BY category;
 
-
+select * from transactions;

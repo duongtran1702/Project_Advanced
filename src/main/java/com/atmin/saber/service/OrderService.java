@@ -8,7 +8,6 @@ import com.atmin.saber.model.enums.OrderStatus;
 import java.util.List;
 
 import java.util.Map;
-import java.util.Optional;
 
 public interface OrderService {
     /**
@@ -28,7 +27,7 @@ public interface OrderService {
     /**
      * Staff: advance order status (PENDING -> PREPARING -> SERVED).
      */
-    OrderStatus advanceOrderStatusForStaff(String orderId);
+    OrderStatus advanceOrderStatusForStaff(int orderId);
 
     /**
      * Staff: advance status for ALL pending orders (FIFO by order_time ASC).
@@ -41,9 +40,10 @@ public interface OrderService {
     int advanceAllPendingOrdersForStaff();
 
     /**
-     * Customer: view latest order (by order_time).
+     * Staff: Reject order (due to out of stock etc.).
+     * Refunds customer's wallet and sets order status to CANCEL.
      */
-    Optional<Order> getLatestOrderOfCustomer(String customerId);
+    void rejectOrderAndRefund(int orderId);
 
     /**
      * Customer: view all orders sorted by order_time DESC.
@@ -53,6 +53,5 @@ public interface OrderService {
     /**
      * Customer: view details (items) for an order.
      */
-    List<OrderDetail> getOrderDetails(String orderId);
+    List<OrderDetail> getOrderDetails(int orderId);
 }
-

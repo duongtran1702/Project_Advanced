@@ -4,12 +4,10 @@ import com.atmin.saber.controller.BookingController;
 import com.atmin.saber.model.Booking;
 import com.atmin.saber.model.Order;
 import com.atmin.saber.model.User;
-import com.atmin.saber.model.OrderDetail;
 import com.atmin.saber.model.Product;
 import com.atmin.saber.service.OrderService;
 import com.atmin.saber.service.ProductService;
 import com.atmin.saber.service.WalletService;
-import com.atmin.saber.model.Transaction;
 import com.atmin.saber.config.AppFactory;
 import com.atmin.saber.util.CyberColors;
 import com.atmin.saber.util.SessionContext;
@@ -67,19 +65,16 @@ public class CustomerMenu {
             int choice = showDashboard();
             switch (choice) {
                 case 1 -> safeRun(this::showAvailablePCs);
-                case 2 -> safeRun(this::startSession);
-                case 3 -> safeRun(this::finishSession);
-                case 4 -> safeRun(this::orderFoodAndDrink);
-                case 5 -> safeRun(this::viewOrderHistory);
-                case 6 -> safeRun(this::viewOrderDetailsById);
-                case 7 -> safeRun(this::viewBalance);
-                case 8 -> safeRun(this::topUp);
-                case 9 -> safeRun(this::viewTransactions);
-                case 10 -> {
+                case 2 -> safeRun(this::toggleSession);
+                case 3 -> safeRun(this::orderFoodAndDrink);
+                case 4 -> safeRun(this::viewOrderHistory);
+                case 5 -> safeRun(this::viewBalance);
+                case 6 -> safeRun(this::topUp);
+                case 7 -> {
                     return;
                 }
 
-                default -> System.out.println("Invalid choice. Please select from 1-10.");
+                default -> System.out.println("Invalid choice. Please select from 1-7.");
             }
         }
     }
@@ -92,22 +87,26 @@ public class CustomerMenu {
         System.out.printf(f + "  ║ " + r + b + "%-52s" + f + " ║%n" + r, "                CUSTOMER DASHBOARD");
         System.out.println(f + "  ╠══════════════════════════╦═══════════════════════════╣" + r);
 
-        // Menu (1-10)
-        printDashboardRow(f, r, "1. View available PCs", "6. Order details");
-        printDashboardRow(f, r, "2. Start session", "7. Wallet balance");
-        printDashboardRow(f, r, "3. Finish session", "8. Wallet top up");
-        printDashboardRow(f, r, "4. Order (F&B)", "9. Transaction history");
-        printDashboardRow(f, r, "5. Order history", "10. Back");
+        String userId = SessionContext.getCurrentUser().map(User::getUserId).orElse(null);
+        boolean hasSession = (userId != null) && bookingController.getActiveBooking(userId).isPresent();
+        // Đánh giá trạng thái máy để hiển thị text phù hợp
+        String sessionAction = hasSession ? "2. Finish session" : "2. Start session";
+
+        // Menu gọn gàng có tích hợp Nạp tiền mô phỏng (1-7)
+        printDashboardRow(f, r, "1. View available PCs", "5. Wallet balance");
+        printDashboardRow(f, r, sessionAction,         "6. Top up (Simulation)");
+        printDashboardRow(f, r, "3. Order (F&B)",      "7. Back");
+        printDashboardRow(f, r, "4. Order history",    "");
         System.out.println(f + "  ╚══════════════════════════════════════════════════════╝" + r);
         while (true) {
             System.out.print(GREEN + "  ➤ Your choice: " + RESET);
             String raw = readLineOrNull();
-            if (raw == null) return 10;
+            if (raw == null) return 7;
             String choice = raw.trim();
             try {
                 return Integer.parseInt(choice);
             } catch (NumberFormatException ignored) {
-                System.out.println("Invalid choice. Please select from 0-10.");
+                System.out.println("Invalid choice. Please select from 1-7.");
             }
         }
     }
@@ -143,44 +142,26 @@ public class CustomerMenu {
         System.out.println("[OK] Top-up successful. New balance: " + walletService.getBalance(userId));
     }
 
-    private void viewTransactions() {
-        String userId = requireLoginOrBack();
-        if (userId == null) return;
-        System.out.println("\n=== RECENT TRANSACTIONS ===");
-        java.util.List<Transaction> txs = walletService.getRecentTransactions(userId, 20);
-        if (txs.isEmpty()) {
-            System.out.println("No transactions.");
-            return;
-        }
-        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-        System.out.println("+------------+---------------+----------+----------------------+------------------------------+");
-        System.out.printf("| %-10s | %-13s | %-8s | %-20s | %-28s |%n", "TX ID", "AMOUNT", "TYPE", "TIME", "DESC");
-        System.out.println("+------------+---------------+----------+----------------------+------------------------------+");
-        for (Transaction t : txs) {
-            String time = t.getCreatedAt() == null ? "" : t.getCreatedAt().format(fmt);
-            System.out.printf("| %-10s | %-13s | %-8s | %-20s | %-28s |%n",
-                    t.getTransactionId(),
-                    t.getAmount(),
-                    t.getTransactionType() == null ? "" : t.getTransactionType().name(),
-                    time,
-                    safeShort(t.getDescription()));
-        }
-        System.out.println("+------------+---------------+----------+----------------------+------------------------------+");
-    }
-
     // viewActiveSession() removed from menu: auto-stop worker + finishSession handle session lifecycle.
 
     /**
      * Spec requirement: customer can start playing immediately if PC is AVAILABLE and wallet can pay at least 1 minute.
      * We create an ACTIVE booking record and set PC status to IN_USE.
+     * If user already has an active session, this toggles to Finish session behavior.
      */
-    private void startSession() {
+    private void toggleSession() {
         String customerId = requireLoginOrBack();
         if (customerId == null) return;
 
-        // Prevent multiple active sessions
         if (bookingController.getActiveBooking(customerId).isPresent()) {
-            System.out.println("You already have an ACTIVE session. Please finish it first.");
+            System.out.println("\n=== FINISH SESSION ===");
+            java.util.Optional<java.math.BigDecimal> charged = bookingController.stopActiveBookingAndCharge(customerId);
+            if (charged.isEmpty()) {
+                System.out.println("No ACTIVE session.");
+                return;
+            }
+            System.out.println("[OK] Session finished. Charged: " + charged.get());
+            System.out.println("New balance: " + walletService.getBalance(customerId));
             return;
         }
 
@@ -212,28 +193,6 @@ public class CustomerMenu {
         System.out.println("You can play about " + payableMinutes + " minute(s) with current balance.");
     }
 
-    private void finishSession() {
-        String customerId = requireLoginOrBack();
-        if (customerId == null) return;
-
-        System.out.println("\n=== FINISH SESSION ===");
-        java.util.Optional<java.math.BigDecimal> charged = bookingController.stopActiveBookingAndCharge(customerId);
-        if (charged.isEmpty()) {
-            System.out.println("No ACTIVE session.");
-            return;
-        }
-        System.out.println("[OK] Session finished. Charged: " + charged.get());
-        System.out.println("New balance: " + walletService.getBalance(customerId));
-    }
-
-    /**
-     * F&B Order flow:
-     * - show products
-     * - user enters items
-     * - charge wallet per item (reserve)
-     * - confirm; if cancel => refund reserved
-     * - if you confirm => create order linked to current ACTIVE booking
-     */
     private void orderFoodAndDrink() {
         String customerId = requireLoginOrBack();
         if (customerId == null) return;
@@ -252,10 +211,6 @@ public class CustomerMenu {
             System.out.println("No products available.");
             return;
         }
-
-        java.util.Map<Integer, Integer> items = new java.util.LinkedHashMap<>();
-        java.util.List<java.math.BigDecimal> chargedAmounts = new java.util.ArrayList<>();
-        java.math.BigDecimal total = java.math.BigDecimal.ZERO;
 
         while (true) {
             printProductMenu(products);
@@ -277,61 +232,40 @@ public class CustomerMenu {
             }
 
             java.math.BigDecimal line = p.getPrice().multiply(java.math.BigDecimal.valueOf(qty));
-            boolean ok = walletService.charge(customerId, line, "F&B item reserved: " + p.getProductName());
-            if (!ok) {
-                System.out.println("Insufficient balance for this item.");
+            
+            // Tính toán trên RAM
+            java.math.BigDecimal currentDebt = bookingController.calculateCurrentDebt(customerId);
+            java.math.BigDecimal balance = walletService.getBalance(customerId);
+            if (balance == null) balance = java.math.BigDecimal.ZERO;
+            java.math.BigDecimal availableBalance = balance.subtract(currentDebt);
+
+            if (availableBalance.compareTo(line) < 0) {
+                System.out.println("Insufficient funds! Available (minus PC debt): " + availableBalance + " VND. Item costs: " + line + " VND.");
                 continue;
             }
 
-            items.merge(pid, qty, Integer::sum);
-            chargedAmounts.add(line);
-            total = total.add(line);
+            // Khoá ví và trừ ngay tiền món ăn vào ví trong Database (WalletService.charge uses row lock natively)
+            boolean ok = walletService.charge(customerId, line, "F&B Ordered: " + p.getProductName() + " x" + qty);
+            if (!ok) {
+                System.out.println("Failed to charge wallet. Please try again.");
+                continue;
+            }
 
-            System.out.println("[OK] Added: " + p.getProductName() + " x" + qty + " (" + line + ")");
-            System.out.println("Current total reserved: " + total);
+            // Tạo đơn hàng ngay lập tức
+            java.util.Map<Integer, Integer> itemsMap = java.util.Collections.singletonMap(pid, qty);
+            OrderService.CreatedOrder created = orderService.createOrderForBooking(customerId, active, itemsMap);
+            
+            System.out.println("[OK] Order placed successfully! Order ID: " + created.order().getOrderId());
+            System.out.println("Deducted " + line + " VND. Remaining Available Balance: " + availableBalance.subtract(line) + " VND.");
 
-            System.out.print("Add more? (Y/N): ");
+            System.out.print("\nDo you want to order more? (Y/N): ");
             String moreLine = readLineOrNull();
             if (moreLine == null) break;
             String more = moreLine.trim();
-            if (!more.equalsIgnoreCase("Y")) break;
-        }
-
-        if (items.isEmpty()) {
-            System.out.println("No items selected.");
-            return;
-        }
-
-        System.out.println("\n=== ORDER SUMMARY ===");
-        System.out.println("+------+----------------------+----------+---------------+---------------+");
-        System.out.printf("| %-4s | %-20s | %-8s | %-13s | %-13s |%n", "ID", "NAME", "QTY", "UNIT", "LINE");
-        System.out.println("+------+----------------------+----------+---------------+---------------+");
-        for (var e : items.entrySet()) {
-            Product p = productService.getById(e.getKey()).orElse(null);
-            if (p == null) continue;
-            int qty = e.getValue();
-            java.math.BigDecimal line = p.getPrice().multiply(java.math.BigDecimal.valueOf(qty));
-            System.out.printf("| %-4d | %-20s | %-8d | %-13s | %-13s |%n",
-                    p.getId(), safeShort(p.getProductName()), qty, p.getPrice(), line);
-        }
-        System.out.println("+------+----------------------+----------+---------------+---------------+");
-        System.out.println("TOTAL: " + total);
-
-        System.out.print("Confirm order? (Y/N): ");
-        String confirmLine = readLineOrNull();
-        if (confirmLine == null) return;
-        String confirm = confirmLine.trim();
-        if (!confirm.equalsIgnoreCase("Y")) {
-            for (java.math.BigDecimal amt : chargedAmounts) {
-                walletService.topUp(customerId, amt, "Refund reserved F&B (cancelled)");
+            if (!more.equalsIgnoreCase("Y")) {
+                break;
             }
-            System.out.println("Order cancelled. Reserved amount refunded.");
-            return;
         }
-
-        OrderService.CreatedOrder created = orderService.createOrderForBooking(customerId, active, items);
-        System.out.println("[OK] Order created. Order ID: " + created.order().getOrderId());
-        System.out.println("Status: " + created.order().getStatus());
     }
 
     private void printProductMenu(java.util.List<Product> products) {
@@ -407,47 +341,54 @@ public class CustomerMenu {
                     o.getOrderId(), time, status, o.getTotalAmount());
         }
         System.out.println("+--------------------------------------+----------------------+-----------+---------------+");
-    }
 
-    private void viewOrderDetailsById() {
-        String customerId = requireLoginOrBack();
-        if (customerId == null) return;
+        // Allow customer to input an order id to view details (items)
+        while (true) {
+            System.out.print("Enter Order ID to view details (or 0 to return): ");
+            String rawLine = readLineOrNull();
+            if (rawLine == null) return;
+            String input = rawLine.trim();
+            if (input.isEmpty() || "0".equals(input)) return;
 
-        System.out.println("\n=== VIEW ORDER DETAILS ===");
-        System.out.print("Enter Order ID (or 0 to return): ");
-        String orderIdLine = readLineOrNull();
-        if (orderIdLine == null) return;
-        String orderId = orderIdLine.trim();
-        if ("0".equals(orderId)) return;
+            try {
+                int orderId = Integer.parseInt(input);
+                boolean belongsToCustomer = orders.stream().anyMatch(o -> orderId == o.getOrderId());
+                if (!belongsToCustomer) {
+                    System.out.println("Order ID not found in your history.");
+                    continue;
+                }
 
-        // Ownership check without loading all orders (more scalable)
-        boolean owned = false;
-        try {
-            owned = orderService.getAllOrdersOfCustomer(customerId).stream().anyMatch(o -> orderId.equals(o.getOrderId()));
-        } catch (RuntimeException ignored) {
+                java.util.List<com.atmin.saber.model.OrderDetail> details;
+                try {
+                    details = orderService.getOrderDetails(orderId);
+                } catch (RuntimeException ex) {
+                    System.out.println("Cannot load order details: " + ex.getMessage());
+                    continue;
+                }
+
+                if (details == null || details.isEmpty()) {
+                    System.out.println("No items for this order.");
+                    continue;
+                }
+
+                System.out.println("\n=== ORDER DETAILS: " + orderId + " ===");
+                System.out.println("+------+----------------------+----------+---------------+");
+                System.out.printf("| %-4s | %-20s | %-8s | %-13s |%n", "ID", "NAME", "QTY", "UNIT PRICE");
+                System.out.println("+------+----------------------+----------+---------------+");
+                for (com.atmin.saber.model.OrderDetail d : details) {
+                    int pid = d.getId();
+                    String name = productService.getById(pid).map(Product::getProductName).orElse("(missing)");
+                    System.out.printf("| %-4d | %-20s | %-8d | %-13s |%n",
+                            pid,
+                            safeShort(name),
+                            d.getQuantity() == null ? 0 : d.getQuantity(),
+                            d.getUnitPrice() == null ? "0" : d.getUnitPrice().toString());
+                }
+                System.out.println("+------+----------------------+----------+---------------+");
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid Order ID format. Please enter a number.");
+            }
         }
-        if (!owned) {
-            System.out.println("Order not found in your account.");
-            return;
-        }
-
-        java.util.List<OrderDetail> details = orderService.getOrderDetails(orderId);
-        if (details.isEmpty()) {
-            System.out.println("No items found for this order.");
-            return;
-        }
-
-        System.out.println("+--------------------------------------+-------+----------+---------------+");
-        System.out.printf("| %-36s | %-5s | %-8s | %-13s |%n", "DETAIL ID", "PID", "QTY", "UNIT PRICE");
-        System.out.println("+--------------------------------------+-------+----------+---------------+");
-        for (OrderDetail d : details) {
-            System.out.printf("| %-36s | %-5d | %-8d | %-13s |%n",
-                    d.getDetailId(),
-                    d.getId() == null ? 0 : d.getId(),
-                    d.getQuantity() == null ? 0 : d.getQuantity(),
-                    d.getUnitPrice());
-        }
-        System.out.println("+--------------------------------------+-------+----------+---------------+");
     }
 
     private void showAvailablePCs() {

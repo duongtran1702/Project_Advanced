@@ -30,32 +30,28 @@ public class SessionBillingServiceImpl implements SessionBillingService {
 
     @Override
     public void startBooking(String customerId, int pcId, LocalDateTime startTime) {
-        Booking booking = bookingDao.findById(customerId, pcId, startTime)
-                .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
-
-        if (booking.getStatus() != BookingStatus.PENDING) {
-            throw new IllegalStateException("Only PENDING booking can be started");
-        }
-
-        PC pc = pcDao.findById(pcId).orElseThrow(() -> new IllegalArgumentException("PC not found"));
-        if (pc.getStatus() != PCStatus.AVAILABLE && pc.getStatus() != PCStatus.BOOKED) {
-            throw new IllegalStateException("PC is not available to start: " + pc.getStatus());
-        }
-
         // Check wallet before allowing to start
         BigDecimal balance = walletService.getBalance(customerId);
         if (balance == null || balance.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalStateException("Insufficient balance. Please top up before starting.");
         }
 
-        // Start session
-        // Record real start_time at the moment staff starts the session
-        booking.setStartTime(LocalDateTime.now());
-        booking.setStatus(BookingStatus.ACTIVE);
-        // reset total fee while playing
-        booking.setTotalFee(BigDecimal.ZERO);
-        bookingDao.update(booking);
+        PC pc = pcDao.findById(pcId).orElseThrow(() -> new IllegalArgumentException("PC not found"));
+        if (pc.getStatus() != PCStatus.AVAILABLE) {
+            throw new IllegalStateException("PC is not available to start. Current status: " + pc.getStatus());
+        }
 
+        // Walk-in booking creation
+        Booking booking = new Booking();
+        booking.setCustomerId(customerId);
+        booking.setPcId(pcId);
+        booking.setStartTime(startTime);
+        booking.setExpectedEndTime(startTime.plusDays(1)); // Arbitrary expected end time
+        booking.setStatus(BookingStatus.ACTIVE);
+        booking.setTotalFee(BigDecimal.ZERO);
+        bookingDao.insert(booking);
+
+        // Mark PC in use
         pc.setStatus(PCStatus.IN_USE);
         pcDao.update(pc);
     }
@@ -70,19 +66,26 @@ public class SessionBillingServiceImpl implements SessionBillingService {
 
         BigDecimal fee = calculateFee(booking.getStartTime(), end, getHourlyRateForZone(resolveRoomName(booking.getPcId())));
 
-        // Insufficient funds => refuse to stop
+        // Thử trừ tổng nợ PC (Luồng 4)
         boolean charged = walletService.charge(customerId, fee, "PC session fee");
         if (!charged) {
-            throw new IllegalStateException("Insufficient balance. Please top up before stopping the session.");
+            // Không đủ tiền trả toàn bộ => trừ tối đa số dư còn lại
+            BigDecimal currentBalance = walletService.getBalance(customerId);
+            if (currentBalance != null && currentBalance.compareTo(BigDecimal.ZERO) > 0) {
+                fee = currentBalance;
+                walletService.charge(customerId, fee, "PC session fee (capped due to low balance)");
+            } else {
+                fee = BigDecimal.ZERO;
+            }
         }
 
-        // Mark completed + set total_fee + actual_end_time
+        // Đánh dấu kết thúc phiên
         booking.setActualEndTime(end);
         booking.setTotalFee(fee);
         booking.setStatus(BookingStatus.COMPLETED);
         bookingDao.update(booking);
 
-        // Release PC
+        // Giải phóng PC
         PC pc = pcDao.findById(booking.getPcId()).orElse(null);
         if (pc != null) {
             pc.setStatus(PCStatus.AVAILABLE);
@@ -107,75 +110,45 @@ public class SessionBillingServiceImpl implements SessionBillingService {
         Booking booking = activeOpt.get();
         if (booking.getStartTime() == null) return;
 
-        // pricing
+        // Tính giá mỗi phút
         String roomName = resolveRoomName(booking.getPcId());
         BigDecimal hourlyRate = getHourlyRateForZone(roomName);
         BigDecimal perMinute = hourlyRate.divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
         if (perMinute.compareTo(BigDecimal.ZERO) <= 0) return;
 
-        // used minutes so far (rounded up)
+        // Tính nợ PC tạm tính
         LocalDateTime now = LocalDateTime.now();
-        long seconds = ChronoUnit.SECONDS.between(booking.getStartTime(), now);
-        long usedMinutes = (long) Math.ceil(Math.max(1, seconds) / 60.0);
+        BigDecimal currentDebt = calculateFee(booking.getStartTime(), now, hourlyRate);
 
-        // how many minutes can be paid by current balance
+        // Lấy số dư từ ví
         BigDecimal balance = walletService.getBalance(customerId);
         if (balance == null) balance = BigDecimal.ZERO;
 
-        long payableMinutes = balance.divide(perMinute, 0, RoundingMode.FLOOR).longValue();
-        if (payableMinutes <= 0) {
-            // cannot pay even 1 minute => stop at 0 payable: set end to start and no charge
-            forceCompleteWithoutCharge(booking);
-            return;
+        // Tính toán trên RAM: Số dư khả dụng
+        BigDecimal availableBalance = balance.subtract(currentDebt);
+
+        // Nếu Số dư khả dụng <= 0 -> Khách hết tiền -> Gọi Luồng 4 để dọn dẹp và trừ tiền
+        if (availableBalance.compareTo(BigDecimal.ZERO) <= 0) {
+            System.out.println("[AutoStop] Detected no available balance for customer=" + customerId + ". Initiating shutdown.");
+            stopActiveBookingAndCharge(customerId);
         }
-
-        if (usedMinutes <= payableMinutes) {
-            // still covered
-            return;
-        }
-
-        // Stop at the last payable minute boundary
-        LocalDateTime payableEnd = booking.getStartTime().plusMinutes(payableMinutes);
-        BigDecimal fee = perMinute.multiply(BigDecimal.valueOf(payableMinutes));
-
-        boolean charged = walletService.charge(customerId, fee, "PC session fee (auto-stop)");
-        if (!charged) {
-            // race with other charge/topup; do nothing and retry next tick
-            return;
-        }
-
-        booking.setActualEndTime(payableEnd);
-        booking.setTotalFee(fee);
-        booking.setStatus(BookingStatus.COMPLETED);
-        bookingDao.update(booking);
-
-        // Release PC
-        PC pc = pcDao.findById(booking.getPcId()).orElse(null);
-        if (pc != null) {
-            pc.setStatus(PCStatus.AVAILABLE);
-            pcDao.update(pc);
-        }
-
-        System.out.println("[AutoStop] Session stopped for customer=" + customerId + ", charged=" + fee);
     }
 
-    private void forceCompleteWithoutCharge(Booking booking) {
-        booking.setActualEndTime(booking.getStartTime());
-        booking.setTotalFee(BigDecimal.ZERO);
-        booking.setStatus(BookingStatus.COMPLETED);
-        bookingDao.update(booking);
+    @Override
+    public BigDecimal calculateCurrentDebt(String customerId) {
+        if (customerId == null || customerId.isBlank()) return BigDecimal.ZERO;
+        Optional<Booking> activeOpt = bookingDao.findActiveByCustomerId(customerId);
+        if (activeOpt.isEmpty()) return BigDecimal.ZERO;
 
-        PC pc = pcDao.findById(booking.getPcId()).orElse(null);
-        if (pc != null) {
-            pc.setStatus(PCStatus.AVAILABLE);
-            pcDao.update(pc);
-        }
-        System.out.println("[AutoStop] Session stopped due to zero balance. customer=" + booking.getCustomerId());
+        Booking booking = activeOpt.get();
+        if (booking.getStartTime() == null) return BigDecimal.ZERO;
+
+        String roomName = resolveRoomName(booking.getPcId());
+        BigDecimal hourlyRate = getHourlyRateForZone(roomName);
+        return calculateFee(booking.getStartTime(), LocalDateTime.now(), hourlyRate);
     }
 
     private String resolveRoomName(int pcId) {
-        // booking fee logic currently uses roomName mapping (atmin2/3...)
-        // PC already has roomName in model (loaded via PcDaoImpl).
         return pcDao.findById(pcId).map(PC::getRoomName).orElse("");
     }
 

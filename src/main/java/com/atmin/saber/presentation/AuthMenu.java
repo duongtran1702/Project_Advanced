@@ -45,23 +45,17 @@ public final class AuthMenu {
 
     public static LoginInput promptLogin(Scanner sc) {
         System.out.println(CYAN + BOLD + "\n  === LOGIN ===" + RESET);
-        System.out.print("\tUsername: ");
-        String username = readLineNonNull(sc);
-        System.out.print("\tPassword: ");
-        String password = readLineNonNull(sc);
+        String username = ConsoleInput.readNonEmpty(sc, "\tUsername: ", "\tUsername cannot be empty.");
+        String password = ConsoleInput.readNonEmpty(sc, "\tPassword: ", "\tPassword cannot be empty.");
         return new LoginInput(username, password);
     }
 
     public static RegisterInput promptRegister(Scanner sc) {
         System.out.println(CYAN + BOLD + "\n  === REGISTER ===" + RESET);
-        System.out.print("\tUsername: ");
-        String username = readLineNonNull(sc);
-        System.out.print("\tPassword (>=6 chars): ");
-        String password = readLineNonNull(sc);
-        System.out.print("\tPhone: ");
-        String phone = readLineNonNull(sc);
-        System.out.print("\tFull name: ");
-        String fullname = readLineNonNull(sc);
+        String username = ConsoleInput.readNonEmpty(sc, "\tUsername: ", "\tUsername cannot be empty.");
+        String password = ConsoleInput.readNonEmpty(sc, "\tPassword (>=6 chars): ", "\tPassword cannot be empty.");
+        String phone = ConsoleInput.readNonEmpty(sc, "\tPhone: ", "\tPhone cannot be empty.");
+        String fullname = ConsoleInput.readNonEmpty(sc, "\tFull name: ", "\tFull name cannot be empty.");
 
         return new RegisterInput(username, password, phone, fullname);
     }
@@ -107,14 +101,12 @@ public final class AuthMenu {
     }
 
     public static void pause(Scanner sc) {
-        System.out.print("\tPress Enter to continue...");
-        readLineNonNull(sc);
-        System.out.println();
+        ConsoleInput.pressEnterToContinue(sc);
     }
 
     private static int readInt(Scanner sc) {
         while (true) {
-            String raw = readLineNonNull(sc).trim();
+            String raw = ConsoleInput.readLineOrThrow(sc).trim();
             if (raw.isEmpty()) {
                 System.out.print(GREEN + "  ➤ Your choice: " + RESET);
                 continue;
@@ -128,8 +120,6 @@ public final class AuthMenu {
         }
     }
 
-    private static String readLineNonNull(Scanner sc) {
-        return ConsoleInput.readLineOrThrow(sc);
-    }
+
 }
 

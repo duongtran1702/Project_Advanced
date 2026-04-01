@@ -1,6 +1,7 @@
 package com.atmin.saber.dao.impl;
 
 import com.atmin.saber.dao.UserDao;
+import com.atmin.saber.dao.base.BaseDao;
 import com.atmin.saber.model.User;
 import com.atmin.saber.model.enums.UserRole;
 import com.atmin.saber.util.DBConnection;
@@ -9,12 +10,10 @@ import java.math.BigDecimal;
 import java.sql.*;
 import java.util.*;
 
-public class UserDaoImpl implements UserDao {
-
-    private final DBConnection db;
+public class UserDaoImpl extends BaseDao implements UserDao {
 
     public UserDaoImpl(DBConnection db) {
-        this.db = Objects.requireNonNull(db, "db must not be null");
+        super(db);
     }
 
     @Override
@@ -22,7 +21,7 @@ public class UserDaoImpl implements UserDao {
         if (username == null) return Optional.empty();
 
         String sql = """
-                SELECT u.user_id, u.username, u.password_hash, u.phone, u.fullname, u.balance, r.role_name,u.status
+                SELECT u.user_id, u.username, u.password_hash, u.phone, u.fullname, u.balance, r.role_name, u.status
                 FROM users u
                 LEFT JOIN user_roles ur ON ur.user_id = u.user_id
                 LEFT JOIN roles r ON r.role_id = ur.role_id
@@ -77,15 +76,7 @@ public class UserDaoImpl implements UserDao {
         if (username == null || username.trim().isEmpty()) return false;
 
         String sql = "SELECT 1 FROM users WHERE username = ? LIMIT 1";
-        try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, username.trim());
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("No user exists: " + username, e);
-        }
+        return executeQuery(sql, ResultSet::next, username.trim());
     }
 
     @Override
@@ -93,15 +84,7 @@ public class UserDaoImpl implements UserDao {
         if (phone == null || phone.trim().isEmpty()) return false;
 
         String sql = "SELECT 1 FROM users WHERE phone = ? LIMIT 1";
-        try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, phone.trim());
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("No user exists with phone: " + phone, e);
-        }
+        return executeQuery(sql, ResultSet::next, phone.trim());
     }
 
     @Override
@@ -185,17 +168,11 @@ public class UserDaoImpl implements UserDao {
     public BigDecimal getBalance(String userId) {
         if (userId == null || userId.trim().isEmpty()) return BigDecimal.ZERO;
         String sql = "SELECT balance FROM users WHERE user_id = ?";
-        try (Connection con = db.getConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setString(1, userId.trim());
-            try (ResultSet rs = ps.executeQuery()) {
-                if (!rs.next()) return BigDecimal.ZERO;
-                BigDecimal b = rs.getBigDecimal("balance");
-                return b == null ? BigDecimal.ZERO : b;
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("DB error while reading balance", e);
-        }
+        return executeQuery(sql, rs -> {
+            if (!rs.next()) return BigDecimal.ZERO;
+            BigDecimal b = rs.getBigDecimal("balance");
+            return b == null ? BigDecimal.ZERO : b;
+        }, userId.trim());
     }
 
     @Override
@@ -205,10 +182,8 @@ public class UserDaoImpl implements UserDao {
         if (delta == null) delta = BigDecimal.ZERO;
 
         String sql = "UPDATE users SET balance = balance + ? WHERE user_id = ?";
-        try (PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setBigDecimal(1, delta);
-            ps.setString(2, userId.trim());
-            ps.executeUpdate();
+        try {
+            executeUpdate(con, sql, delta, userId.trim());
         } catch (SQLException e) {
             throw new RuntimeException("DB error while updating balance", e);
         }
@@ -222,11 +197,8 @@ public class UserDaoImpl implements UserDao {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) return true;
 
         String sql = "UPDATE users SET balance = balance - ? WHERE user_id = ? AND balance >= ?";
-        try (PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setBigDecimal(1, amount);
-            ps.setString(2, userId.trim());
-            ps.setBigDecimal(3, amount);
-            return ps.executeUpdate() > 0;
+        try {
+            return executeUpdate(con, sql, amount, userId.trim(), amount) > 0;
         } catch (SQLException e) {
             throw new RuntimeException("DB error while deducting balance", e);
         }

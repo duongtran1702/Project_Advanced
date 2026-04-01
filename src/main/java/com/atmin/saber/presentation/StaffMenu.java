@@ -15,8 +15,8 @@ import static com.atmin.saber.util.CyberColors.*;
 /**
  * Staff console menu:
  * - View pending bookings (PENDING)
- * - View pending F&B orders (PENDING / PREPARING)
- * - Advance order status: PENDING -> PREPARING -> SERVED
+ * - View pending F&B orders (PENDING)
+ * - Advance order status: PENDING -> COMPLETED
  */
 public class StaffMenu {
     private final OrderService orderService;
@@ -36,13 +36,15 @@ public class StaffMenu {
             System.out.println(CYAN + BOLD + "\n  === STAFF MENU ===" + RESET);
             System.out.println("\t1. View pending F&B orders (FIFO)");
             System.out.println("\t2. Update (advance) F&B order status (one/all)");
+            System.out.println("\t3. Reject ONE order (Cancel & Refund)");
             System.out.println("\t0. Back");
             System.out.print(GREEN + "  ➤ Select option: " + RESET);
 
             String choice = promptMenuChoice(scanner);
             switch (choice) {
                 case "1" -> safeRun(this::viewPendingOrders);
-                case "2" -> safeRun(this::advanceOrderStatus);
+                case "2" -> safeRun(this::advanceOrderLogic);
+                case "3" -> safeRun(this::rejectOrderLogic);
                 case "0" -> {
                     return;
                 }
@@ -52,22 +54,10 @@ public class StaffMenu {
     }
 
     private static String promptMenuChoice(Scanner scanner) {
-        while (true) {
-            if (!scanner.hasNextLine()) {
-                System.out.println("\n\tNo more input. Returning...");
-                return "0";
-            }
-            String input = scanner.nextLine().trim();
-            switch (input) {
-                case "0", "1", "2" -> {
-                    return input;
-                }
-                default -> {
-                    System.out.print("\tInvalid choice.\n");
-                    System.out.print(GREEN + "  ➤ Select option: " + RESET);
-                }
-            }
+        if (!scanner.hasNextLine()) {
+            return "0";
         }
+        return scanner.nextLine().trim();
     }
 
     private void viewPendingOrders() {
@@ -75,40 +65,63 @@ public class StaffMenu {
         printPendingOrders(true);
     }
 
-    private void advanceOrderStatus() {
-        while (true) {
-            System.out.println("\n=== UPDATE (ADVANCE) F&B ORDER STATUS ===");
-            System.out.println("  1. Update ONE order (advance 1 step)");
-            System.out.println("  2. Update ALL pending orders (FIFO, advance 1 step each)");
-            System.out.println("  0. Back");
-            System.out.print("-> Select option (0-2): ");
+    private void advanceOrderLogic() {
+        printPendingOrders(false);
+        if (orderService.getPendingOrdersForStaff().isEmpty()) {
+            ConsoleInput.pressEnterToContinue(scanner);
+            return;
+        }
 
-            if (!scanner.hasNextLine()) return;
-            String choice = scanner.nextLine().trim();
-            switch (choice) {
-                case "1" -> {
-                    // show list first so staff can copy/paste orderId (no pause)
-                    printPendingOrders(false);
-                    System.out.print("Enter orderId (or 0 to return): ");
-                    if (!scanner.hasNextLine()) return;
-                    String orderId = scanner.nextLine().trim();
-                    if ("0".equals(orderId)) continue;
+        System.out.print("Enter Order ID to advance, or 'ALL' to advance all (0 to return): ");
+        if (!scanner.hasNextLine()) return;
+        
+        String input = scanner.nextLine().trim();
+        if ("0".equals(input) || input.isEmpty()) {
+            return;
+        }
 
-                    OrderStatus next = orderService.advanceOrderStatusForStaff(orderId);
-                    System.out.println("[OK] Updated status to: " + next.name() + formatStaffMeaning(next));
-                    ConsoleInput.pressEnterToContinue(scanner);
-                }
-                case "2" -> {
-                    int updated = orderService.advanceAllPendingOrdersForStaff();
-                    System.out.println("[OK] Updated " + updated + " pending order(s).");
-                    ConsoleInput.pressEnterToContinue(scanner);
-                }
-                case "0" -> {
-                    return;
-                }
-                default -> System.out.println("Invalid option.");
+        if ("ALL".equalsIgnoreCase(input)) {
+            int updated = orderService.advanceAllPendingOrdersForStaff();
+            System.out.println("[OK] Updated " + updated + " pending order(s).");
+        } else {
+            try {
+                int orderId = Integer.parseInt(input);
+                OrderStatus next = orderService.advanceOrderStatusForStaff(orderId);
+                System.out.println("[OK] Updated status to: " + next.name() + formatStaffMeaning(next));
+            } catch (NumberFormatException e) {
+                System.out.println("Error: Invalid Order ID format. Please enter a number.");
+            } catch (IllegalArgumentException e) {
+                System.out.println("Error: " + e.getMessage());
             }
         }
+        ConsoleInput.pressEnterToContinue(scanner);
+    }
+
+    private void rejectOrderLogic() {
+        printPendingOrders(false);
+        if (orderService.getPendingOrdersForStaff().isEmpty()) {
+            ConsoleInput.pressEnterToContinue(scanner);
+            return;
+        }
+
+        System.out.print("Enter Order ID to REJECT (or 0 to return): ");
+        if (!scanner.hasNextLine()) return;
+        
+        String input = scanner.nextLine().trim();
+        if ("0".equals(input) || input.isEmpty()) {
+            return;
+        }
+
+        try {
+            int orderId = Integer.parseInt(input);
+            orderService.rejectOrderAndRefund(orderId);
+            System.out.println("[OK] Order rejected and refunded.");
+        } catch (NumberFormatException e) {
+            System.out.println("Error: Invalid Order ID format. Please enter a number.");
+        } catch (IllegalArgumentException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+        ConsoleInput.pressEnterToContinue(scanner);
     }
 
     private void printPendingOrders(boolean pauseAfter) {
@@ -142,9 +155,9 @@ public class StaffMenu {
         if (status == null) return "";
         return switch (status) {
             case PENDING -> " (Confirmed)";
-            case PREPARING -> " (Serving)";
-            case SERVED -> " (Completed)";
+            case COMPLETED -> " (Completed)";
             case PAID -> " (Paid)";
+            case CANCELLED -> " (Cancelled)";
         };
     }
 
