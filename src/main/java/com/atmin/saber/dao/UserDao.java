@@ -9,7 +9,9 @@ import java.util.Optional;
 public interface UserDao {
     Optional<User> findByUsernameWithRoles(String username);
 
-    // Kiểm tra username đã tồn tại chưa
+    Optional<User> findById(String userId);
+
+    // ... existing code ...
     boolean existsByUsername(String username);
 
     // Kiểm tra phone đã tồn tại chưa

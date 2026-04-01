@@ -59,6 +59,27 @@ public class UserDaoImpl extends BaseDao implements UserDao {
         }
     }
 
+    @Override
+    public Optional<User> findById(String userId) {
+        if (userId == null || userId.trim().isEmpty()) return Optional.empty();
+
+        String sql = "SELECT user_id, username, password_hash, phone, fullname, balance, status FROM users WHERE user_id = ?";
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, userId.trim());
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapUser(rs));
+                }
+                return Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Database error when searching for user by ID: " + userId, e);
+        }
+    }
+
     private User mapUser(ResultSet rs) throws SQLException {
         User u = new User();
         u.setUserId(rs.getString("user_id"));

@@ -12,5 +12,7 @@ public interface StatisticsDao {
     Map<java.time.LocalDate, BigDecimal> topupByDay(java.time.YearMonth month);
 
     Map<java.time.LocalDate, BigDecimal> paymentByDay(java.time.YearMonth month);
+
+    Map<java.time.LocalDate, BigDecimal> refundByDay(java.time.YearMonth month);
 }
 

@@ -8,10 +8,15 @@ public enum TransactionType {
     TOPUP,
 
     /**
-     * Backward-compatible alias of TOPUP used by some older code.
+     * Payment for services and products.
+     * DB value: PAYMENT
      */
-    DEPOSIT,
     PAYMENT,
+
+    /**
+     * Refund transaction.
+     * DB value: REFUND
+     */
     REFUND
 }
 

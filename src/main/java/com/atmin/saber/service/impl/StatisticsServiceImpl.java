@@ -27,6 +27,7 @@ public class StatisticsServiceImpl implements StatisticsService {
         Map<LocalDate, BigDecimal> fnb = statisticsDao.fnbRevenueByDay(month);
         Map<LocalDate, BigDecimal> topup = statisticsDao.topupByDay(month);
         Map<LocalDate, BigDecimal> payment = statisticsDao.paymentByDay(month);
+        Map<LocalDate, BigDecimal> refund = statisticsDao.refundByDay(month);
 
         List<DailyRow> rows = new ArrayList<>();
         int days = month.lengthOfMonth();
@@ -37,7 +38,8 @@ public class StatisticsServiceImpl implements StatisticsService {
                     session.getOrDefault(date, BigDecimal.ZERO),
                     fnb.getOrDefault(date, BigDecimal.ZERO),
                     topup.getOrDefault(date, BigDecimal.ZERO),
-                    payment.getOrDefault(date, BigDecimal.ZERO)
+                    payment.getOrDefault(date, BigDecimal.ZERO),
+                    refund.getOrDefault(date, BigDecimal.ZERO)
             ));
         }
         return rows;

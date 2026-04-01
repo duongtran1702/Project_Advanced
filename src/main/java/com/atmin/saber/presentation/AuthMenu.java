@@ -37,7 +37,6 @@ public final class AuthMenu {
     public static int showMenu(Scanner sc) {
         System.out.println("\t1. Login");
         System.out.println("\t2. Register");
-        System.out.println("\t3. Continue as guest");
         System.out.println("\t0. Exit");
         System.out.print(GREEN + "  ➤ Your choice: " + RESET);
         return readInt(sc);

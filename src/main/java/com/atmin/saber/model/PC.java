@@ -38,10 +38,6 @@ public class PC {
         this.pcName = pcName;
     }
 
-    public Integer getRoomId() {
-        return roomId;
-    }
-
     public void setRoomId(Integer roomId) {
         this.roomId = roomId;
     }

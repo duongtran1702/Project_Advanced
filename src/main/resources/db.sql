@@ -187,8 +187,23 @@ VALUES
     ('Thẻ Garena 200k', 'Thẻ nạp Garena 200.000đ', 200000.00, 15, 'CARD'),
     ('Thẻ Steam 50k', 'Thẻ nạp Steam 50.000đ', 50000.00, 25, 'CARD'),
     ('Thẻ Steam 100k', 'Thẻ nạp Steam 100.000đ', 100000.00, 20, 'CARD'),
-    ('Thẻ Zing 100k', 'Thẻ nạp Zing 100.000đ', 100000.00, 18, 'CARD'),
+     ('Thẻ Zing 100k', 'Thẻ nạp Zing 100.000đ', 100000.00, 18, 'CARD'),
     ('Thẻ LMHT 50k', 'Thẻ nạp Liên Minh Huyền Thoại', 50000.00, 35, 'CARD');
+
+-- ==========================================
+-- TEST DATA: Sample transactions (all amounts positive)
+-- ==========================================
+
+INSERT INTO transactions(user_id, amount, transaction_type, description, created_at)
+VALUES
+    ((SELECT user_id FROM users WHERE username = 'admin' LIMIT 1), 100000.00, 'TOPUP', 'Nạp tiền', '2026-04-01 10:00:00'),
+    ((SELECT user_id FROM users WHERE username = 'admin' LIMIT 1), 50000.00, 'PAYMENT', 'Thanh toán PC', '2026-04-01 11:00:00'),
+    ((SELECT user_id FROM users WHERE username = 'admin' LIMIT 1), 25000.00, 'PAYMENT', 'Đặt hàng ăn', '2026-04-01 12:00:00'),
+    ((SELECT user_id FROM users WHERE username = 'admin' LIMIT 1), 500.00, 'REFUND', 'Hoàn tiền', '2026-04-01 09:00:00');
 
 
 select * from transactions;
+select sum(amount) from transactions where transaction_type = 'TOPUP';
+select * from pcs;
+select * from products;
+select * from orders;

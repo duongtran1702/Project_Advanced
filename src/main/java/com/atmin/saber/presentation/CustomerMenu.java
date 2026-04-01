@@ -17,23 +17,22 @@ import java.util.Scanner;
 import static com.atmin.saber.util.CyberColors.GREEN;
 import static com.atmin.saber.util.CyberColors.RESET;
 
-public class CustomerMenu {
+public class CustomerMenu extends BaseMenu {
     private final BookingController bookingController;
     private final OrderService orderService;
     private final WalletService walletService;
     private final ProductService productService;
-    private final Scanner scanner;
 
     public CustomerMenu(BookingController bookingController,
                         OrderService orderService,
                         WalletService walletService,
                         ProductService productService,
                         Scanner scanner) {
+        super(scanner);
         this.bookingController = bookingController;
         this.orderService = orderService;
         this.walletService = walletService;
         this.productService = productService;
-        this.scanner = scanner;
     }
 
     public static CustomerMenu createDefault(Scanner scanner) {
@@ -46,10 +45,6 @@ public class CustomerMenu {
         );
     }
 
-    private String readLineOrNull() {
-        if (scanner == null || !scanner.hasNextLine()) return null;
-        return scanner.nextLine();
-    }
 
     private String requireLoginOrBack() {
         String userId = SessionContext.getCurrentUser().map(User::getUserId).orElse(null);
@@ -111,9 +106,6 @@ public class CustomerMenu {
         }
     }
 
-    private static void printDashboardRow(String f, String r, String left, String right) {
-        System.out.printf(f + "  ║ " + r + "%-24s" + f + " ║ " + r + "%-25s" + f + " ║%n" + r, left, right);
-    }
 
     private void viewBalance() {
         String userId = requireLoginOrBack();
@@ -311,12 +303,6 @@ public class CustomerMenu {
         };
     }
 
-    private static String safeShort(String s) {
-        if (s == null) return "";
-        String trimmed = s.trim();
-        if (trimmed.length() <= 28) return trimmed;
-        return trimmed.substring(0, 25) + "...";
-    }
 
     private void viewOrderHistory() {
         String customerId = requireLoginOrBack();
@@ -397,19 +383,6 @@ public class CustomerMenu {
 
     // cancelBooking() removed: customer flow starts sessions directly; no PENDING bookings to cancel.
 
-    private void safeRun(Runnable action) {
-        try {
-            action.run();
-        } catch (RuntimeException ex) {
-            System.out.println("Error: " + ex.getMessage());
-        }
-        pause();
-    }
-
-    private void pause() {
-        System.out.print("\nPress Enter to return to menu...");
-        readLineOrNull();
-    }
 
     private int readIntAllowBack() {
         while (true) {

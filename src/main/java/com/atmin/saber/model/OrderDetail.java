@@ -12,24 +12,8 @@ public class OrderDetail {
     public OrderDetail() {
     }
 
-    public OrderDetail(int detailId, int orderId, int id, Integer quantity, BigDecimal unitPrice) {
-        this.detailId = detailId;
-        this.orderId = orderId;
-        this.id = id;
-        this.quantity = quantity;
-        this.unitPrice = unitPrice;
-    }
-
-    public int getDetailId() {
-        return detailId;
-    }
-
     public void setDetailId(int detailId) {
         this.detailId = detailId;
-    }
-
-    public int getOrderId() {
-        return orderId;
     }
 
     public void setOrderId(int orderId) {

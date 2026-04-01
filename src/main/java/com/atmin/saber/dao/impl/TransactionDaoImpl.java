@@ -28,8 +28,6 @@ public class TransactionDaoImpl extends BaseDao implements TransactionDao {
 
     private static String normalizeTypeForDb(TransactionType type) {
         if (type == null) return "PAYMENT";
-        if (type == TransactionType.DEPOSIT) return "TOPUP";
         return type.name();
     }
 }
-

@@ -7,6 +7,7 @@ import com.atmin.saber.model.Order;
 import com.atmin.saber.model.OrderDetail;
 import com.atmin.saber.model.Product;
 import com.atmin.saber.model.enums.OrderStatus;
+import com.atmin.saber.model.enums.TransactionType;
 import com.atmin.saber.service.OrderService;
 import com.atmin.saber.service.ProductService;
 import com.atmin.saber.service.WalletService;
@@ -128,7 +129,10 @@ public class OrderServiceImpl implements OrderService {
                 con.setAutoCommit(false);
                 try {
                     // 1) Check & decrease stock for all items
-                    List<OrderDetail> items = orderDetailDao.findByOrderId(orderId);
+                    List<OrderDetail> items = orderDetailDao.findByOrderId(con, orderId);
+                    if (items.isEmpty()) {
+                        throw new RuntimeException("No items found for order: " + orderId + ". Order details may not have been saved correctly.");
+                    }
                     for (OrderDetail d : items) {
                         int pid = d.getId();
                         int qty = d.getQuantity() == null ? 0 : d.getQuantity();
@@ -143,8 +147,25 @@ public class OrderServiceImpl implements OrderService {
                             boolean st = orderDao.updateStatus(orderId, OrderStatus.CANCELLED.name());
                             if (!st) throw new RuntimeException("Failed to cancel order after out-of-stock");
 
-                            walletService.topUp(current.getCustomerId(), current.getTotalAmount(),
-                                    "Refund for out-of-stock order: " + orderId + " (" + p.getProductName() + ")");
+                            // Add refund to wallet balance
+                            String addBalSql = "UPDATE users SET balance = balance + ? WHERE user_id = ?";
+                            try (java.sql.PreparedStatement balPs = con.prepareStatement(addBalSql)) {
+                                balPs.setBigDecimal(1, current.getTotalAmount());
+                                balPs.setString(2, current.getCustomerId());
+                                int okUser = balPs.executeUpdate();
+                                if (okUser <= 0) throw new RuntimeException("Failed to refund wallet balance");
+                            }
+
+                            // Insert REFUND transaction (positive amount - adds back to balance)
+                            String insertTxSql = "INSERT INTO transactions(user_id, amount, transaction_type, description, created_at) VALUES(?, ?, ?, ?, ?)";
+                            try (java.sql.PreparedStatement txPs = con.prepareStatement(insertTxSql)) {
+                                txPs.setString(1, current.getCustomerId());
+                                txPs.setBigDecimal(2, current.getTotalAmount());
+                                txPs.setString(3, TransactionType.REFUND.name());
+                                txPs.setString(4, "Refund for out-of-stock order: " + orderId + " (" + p.getProductName() + ")");
+                                txPs.setTimestamp(5, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
+                                txPs.executeUpdate();
+                            }
 
                             con.commit();
                             return OrderStatus.CANCELLED;
@@ -219,7 +240,7 @@ public class OrderServiceImpl implements OrderService {
                     try (java.sql.PreparedStatement ps = con.prepareStatement(insertTxSql)) {
                         ps.setString(1, userId);
                         ps.setBigDecimal(2, amount);
-                        ps.setString(3, "TOPUP");
+                        ps.setString(3, TransactionType.REFUND.name());
                         ps.setString(4, "Refund for rejected order: " + orderId);
                         ps.setTimestamp(5, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
                         ps.executeUpdate();
@@ -249,9 +270,16 @@ public class OrderServiceImpl implements OrderService {
             if (o == null) continue;
             if (o.getStatus() == null || !o.getStatus().isStaffUpdatable()) continue;
 
-            OrderStatus next = o.getStatus().nextForStaff();
-            boolean ok = orderDao.updateStatus(o.getOrderId(), next.name());
-            if (ok) updated++;
+            try {
+                // Call advanceOrderStatusForStaff to properly handle stock checking
+                OrderStatus result = advanceOrderStatusForStaff(o.getOrderId());
+                if (result != OrderStatus.CANCELLED) {
+                    updated++;
+                }
+            } catch (Exception ex) {
+                // Log error but continue with next order
+                System.err.println("ERROR: Failed to advance order " + o.getOrderId() + ": " + ex.getMessage());
+            }
         }
         return updated;
     }

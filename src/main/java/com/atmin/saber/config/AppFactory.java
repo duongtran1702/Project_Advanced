@@ -34,5 +34,9 @@ public final class AppFactory {
         TransactionDao txDao = new TransactionDaoImpl(DB);
         return new WalletServiceImpl(userDao, txDao, DB);
     }
+
+    public static UserDao userDao() {
+        return new UserDaoImpl(DB);
+    }
 }
 

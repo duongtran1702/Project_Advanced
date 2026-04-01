@@ -6,7 +6,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public class Transaction {
-    private String transactionId;
     private String userId;
     private BigDecimal amount;
     private TransactionType transactionType;
@@ -16,22 +15,8 @@ public class Transaction {
     public Transaction() {
     }
 
-    public Transaction(String transactionId, String userId, BigDecimal amount, TransactionType transactionType, String description, LocalDateTime createdAt) {
-        this.transactionId = transactionId;
-        this.userId = userId;
-        this.amount = amount;
-        this.transactionType = transactionType;
-        this.description = description;
-        this.createdAt = createdAt;
-    }
 
-    public String getTransactionId() {
-        return transactionId;
-    }
 
-    public void setTransactionId(String transactionId) {
-        this.transactionId = transactionId;
-    }
 
     public String getUserId() {
         return userId;
@@ -76,7 +61,6 @@ public class Transaction {
     @Override
     public String toString() {
         return "Transaction{" +
-                "transactionId=" + transactionId +
                 ", userId=" + userId +
                 ", amount=" + amount +
                 ", transactionType=" + transactionType +

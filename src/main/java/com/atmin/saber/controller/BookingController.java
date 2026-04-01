@@ -10,10 +10,12 @@ import com.atmin.saber.service.impl.BookingServiceImpl;
 import com.atmin.saber.service.impl.SessionBillingServiceImpl;
 import com.atmin.saber.service.impl.WalletServiceImpl;
 import com.atmin.saber.util.DBConnection;
+import com.atmin.saber.util.PricingUtil;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.math.BigDecimal;
 
 public class BookingController {
     private final BookingService bookingService;
@@ -31,7 +33,7 @@ public class BookingController {
         com.atmin.saber.dao.UserDao userDao = new com.atmin.saber.dao.impl.UserDaoImpl(db);
         com.atmin.saber.dao.TransactionDao txDao = new com.atmin.saber.dao.impl.TransactionDaoImpl(db);
         com.atmin.saber.service.WalletService walletService = new WalletServiceImpl(userDao, txDao, db);
-        SessionBillingService sessionBillingService = new SessionBillingServiceImpl(new BookingDaoImpl(db), new PcDaoImpl(db), walletService);
+        SessionBillingService sessionBillingService = new SessionBillingServiceImpl(new BookingDaoImpl(db), new PcDaoImpl(db), walletService, userDao);
 
         return new BookingController(bookingService, sessionBillingService);
     }
@@ -48,23 +50,19 @@ public class BookingController {
         
         for (Map.Entry<String, List<PC>> entry : pcsByZone.entrySet()) {
             System.out.println("\n" + entry.getKey().toUpperCase() + ":");
-            System.out.println("+------+----------------------+--------------+");
-            System.out.printf("| %-4s | %-20s | %-12s |%n", "ID", "NAME", "STATUS");
-            System.out.println("+------+----------------------+--------------+");
-            
+            System.out.println("+------+----------------------+--------------+------------------+");
+            System.out.printf("| %-4s | %-20s | %-12s | %-16s |%n", "ID", "NAME", "STATUS", "PRICE (VND/hr)");
+            System.out.println("+------+----------------------+--------------+------------------+");
+
             for (PC pc : entry.getValue()) {
-                System.out.printf("| %-4d | %-20s | %-12s |%n",
-                    pc.getPcId(), pc.getPcName(), "Available");
+                BigDecimal hourlyRate = PricingUtil.getHourlyRateForZone(entry.getKey());
+                System.out.printf("| %-4d | %-20s | %-12s | %,16d |%n",
+                    pc.getPcId(), pc.getPcName(), "Available", hourlyRate.longValue());
             }
-            System.out.println("+------+----------------------+--------------+");
+            System.out.println("+------+----------------------+--------------+------------------+");
         }
     }
     
-
-
-    
-
-
     public void startBooking(String customerId, int pcId, LocalDateTime startTime) {
         sessionBillingService.startBooking(customerId, pcId, startTime);
     }

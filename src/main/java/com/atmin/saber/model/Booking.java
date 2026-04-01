@@ -17,17 +17,6 @@ public class Booking {
     public Booking() {
     }
 
-    public Booking(String customerId, int pcId, LocalDateTime startTime, LocalDateTime expectedEndTime,
-                   LocalDateTime actualEndTime, BookingStatus status, BigDecimal totalFee) {
-        this.customerId = customerId;
-        this.pcId = pcId;
-        this.startTime = startTime;
-        this.expectedEndTime = expectedEndTime;
-        this.actualEndTime = actualEndTime;
-        this.status = status;
-        this.totalFee = totalFee;
-    }
-
     public String getCustomerId() {
         return customerId;
     }

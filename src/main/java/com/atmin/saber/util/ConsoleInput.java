@@ -36,7 +36,7 @@ public final class ConsoleInput {
     public static int readInt(Scanner sc, String prompt, String invalidMessage) {
         while (true) {
             System.out.print(prompt);
-            String value = readLineOrThrow(sc).trim();
+            String value = sc.nextLine().trim();
             try {
                 return Integer.parseInt(value);
             } catch (NumberFormatException ex) {
@@ -47,7 +47,7 @@ public final class ConsoleInput {
 
     public static void pressEnterToContinue(Scanner sc) {
         System.out.print("\nPress Enter to continue...");
-        readLineOrThrow(sc);
+        sc.nextLine();
     }
 }
 

@@ -7,7 +7,6 @@ import java.time.LocalDateTime;
 
 public class Order {
     private int orderId;
-    private String bookingId; // nullable
     // DB uses composite FK to bookings
     private String bookingCustomerId; // nullable
     private Integer bookingPcId; // nullable
@@ -21,16 +20,6 @@ public class Order {
     public Order() {
     }
 
-    public Order(int orderId, String bookingId, String customerId, LocalDateTime orderTime, OrderStatus status,
-                 BigDecimal totalAmount, String discountCode) {
-        this.orderId = orderId;
-        this.bookingId = bookingId;
-        this.customerId = customerId;
-        this.orderTime = orderTime;
-        this.status = status;
-        this.totalAmount = totalAmount;
-        this.discountCode = discountCode;
-    }
 
     public int getOrderId() {
         return orderId;
@@ -40,13 +29,7 @@ public class Order {
         this.orderId = orderId;
     }
 
-    public String getBookingId() {
-        return bookingId;
-    }
 
-    public void setBookingId(String bookingId) {
-        this.bookingId = bookingId;
-    }
 
     public String getBookingCustomerId() {
         return bookingCustomerId;
@@ -116,7 +99,6 @@ public class Order {
     public String toString() {
         return "Order{" +
                 "orderId=" + orderId +
-                ", bookingId=" + bookingId +
                 ", customerId=" + customerId +
                 ", orderTime=" + orderTime +
                 ", status=" + status +

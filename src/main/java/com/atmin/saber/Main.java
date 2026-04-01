@@ -28,7 +28,7 @@ public class Main {
 		try {
 			WalletService walletService = new WalletServiceImpl(new UserDaoImpl(db), new TransactionDaoImpl(db), db);
 			SessionBillingService sessionBillingService = new SessionBillingServiceImpl(new BookingDaoImpl(db),
-					new PcDaoImpl(db), walletService);
+					new PcDaoImpl(db), walletService, new UserDaoImpl(db));
 			AutoStopService autoStopService = new AutoStopServiceImpl(new BookingDaoImpl(db), sessionBillingService);
 			autoStopService.start();
 		} catch (RuntimeException ex) {

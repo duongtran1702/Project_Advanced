@@ -2,12 +2,15 @@ package com.atmin.saber.service.impl;
 
 import com.atmin.saber.dao.BookingDao;
 import com.atmin.saber.dao.PcDao;
+import com.atmin.saber.dao.UserDao;
 import com.atmin.saber.model.Booking;
 import com.atmin.saber.model.PC;
+import com.atmin.saber.model.User;
 import com.atmin.saber.model.enums.BookingStatus;
 import com.atmin.saber.model.enums.PCStatus;
 import com.atmin.saber.service.SessionBillingService;
 import com.atmin.saber.service.WalletService;
+import com.atmin.saber.util.PricingUtil;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -21,11 +24,13 @@ public class SessionBillingServiceImpl implements SessionBillingService {
     private final BookingDao bookingDao;
     private final PcDao pcDao;
     private final WalletService walletService;
+    private final UserDao userDao;
 
-    public SessionBillingServiceImpl(BookingDao bookingDao, PcDao pcDao, WalletService walletService) {
+    public SessionBillingServiceImpl(BookingDao bookingDao, PcDao pcDao, WalletService walletService, UserDao userDao) {
         this.bookingDao = Objects.requireNonNull(bookingDao, "bookingDao must not be null");
         this.pcDao = Objects.requireNonNull(pcDao, "pcDao must not be null");
         this.walletService = Objects.requireNonNull(walletService, "walletService must not be null");
+        this.userDao = Objects.requireNonNull(userDao, "userDao must not be null");
     }
 
     @Override
@@ -63,8 +68,7 @@ public class SessionBillingServiceImpl implements SessionBillingService {
 
         Booking booking = activeOpt.get();
         LocalDateTime end = LocalDateTime.now();
-
-        BigDecimal fee = calculateFee(booking.getStartTime(), end, getHourlyRateForZone(resolveRoomName(booking.getPcId())));
+        BigDecimal fee = calculateFeeForBooking(booking, end);
 
         // Thử trừ tổng nợ PC (Luồng 4)
         boolean charged = walletService.charge(customerId, fee, "PC session fee");
@@ -111,14 +115,12 @@ public class SessionBillingServiceImpl implements SessionBillingService {
         if (booking.getStartTime() == null) return;
 
         // Tính giá mỗi phút
-        String roomName = resolveRoomName(booking.getPcId());
-        BigDecimal hourlyRate = getHourlyRateForZone(roomName);
+        BigDecimal hourlyRate = PricingUtil.getHourlyRateForZone(resolveRoomName(booking.getPcId()));
         BigDecimal perMinute = hourlyRate.divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
         if (perMinute.compareTo(BigDecimal.ZERO) <= 0) return;
 
         // Tính nợ PC tạm tính
-        LocalDateTime now = LocalDateTime.now();
-        BigDecimal currentDebt = calculateFee(booking.getStartTime(), now, hourlyRate);
+        BigDecimal currentDebt = calculateFeeForBooking(booking, LocalDateTime.now());
 
         // Lấy số dư từ ví
         BigDecimal balance = walletService.getBalance(customerId);
@@ -127,9 +129,9 @@ public class SessionBillingServiceImpl implements SessionBillingService {
         // Tính toán trên RAM: Số dư khả dụng
         BigDecimal availableBalance = balance.subtract(currentDebt);
 
-        // Nếu Số dư khả dụng <= 0 -> Khách hết tiền -> Gọi Luồng 4 để dọn dẹp và trừ tiền
         if (availableBalance.compareTo(BigDecimal.ZERO) <= 0) {
-            System.out.println("[AutoStop] Detected no available balance for customer=" + customerId + ". Initiating shutdown.");
+            String username = getUsernameOrId(customerId);
+            System.out.println("\n[AutoStop] Detected no available balance for customer: " + username + ". Initiating shutdown.");
             stopActiveBookingAndCharge(customerId);
         }
     }
@@ -143,13 +145,22 @@ public class SessionBillingServiceImpl implements SessionBillingService {
         Booking booking = activeOpt.get();
         if (booking.getStartTime() == null) return BigDecimal.ZERO;
 
+        return calculateFeeForBooking(booking, LocalDateTime.now());
+    }
+
+    private BigDecimal calculateFeeForBooking(Booking booking, LocalDateTime endTime) {
         String roomName = resolveRoomName(booking.getPcId());
-        BigDecimal hourlyRate = getHourlyRateForZone(roomName);
-        return calculateFee(booking.getStartTime(), LocalDateTime.now(), hourlyRate);
+        BigDecimal hourlyRate = PricingUtil.getHourlyRateForZone(roomName);
+        return calculateFee(booking.getStartTime(), endTime, hourlyRate);
     }
 
     private String resolveRoomName(int pcId) {
         return pcDao.findById(pcId).map(PC::getRoomName).orElse("");
+    }
+
+    private String getUsernameOrId(String customerId) {
+        Optional<User> userOpt = userDao.findById(customerId);
+        return userOpt.map(User::getUsername).orElse(customerId);
     }
 
     private static BigDecimal calculateFee(LocalDateTime start, LocalDateTime end, BigDecimal hourlyRate) {
@@ -157,15 +168,6 @@ public class SessionBillingServiceImpl implements SessionBillingService {
         long minutes = (long) Math.ceil(Math.max(1, seconds) / 60.0);
         BigDecimal perMinute = hourlyRate.divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
         return perMinute.multiply(BigDecimal.valueOf(minutes));
-    }
-
-    private static BigDecimal getHourlyRateForZone(String roomName) {
-        if (roomName == null) return BigDecimal.valueOf(10000);
-        return switch (roomName.toLowerCase()) {
-            case "atmin2", "atmin5" -> BigDecimal.valueOf(20000);
-            case "atmin3", "atmin6" -> BigDecimal.valueOf(30000);
-            default -> BigDecimal.valueOf(10000);
-        };
     }
 }
 

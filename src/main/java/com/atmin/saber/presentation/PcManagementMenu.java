@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Scanner;
 
 import static com.atmin.saber.controller.PcController.printPcAsTable;
+import static com.atmin.saber.model.enums.PCStatus.AVAILABLE;
 import static com.atmin.saber.util.CyberColors.*;
 
 public class PcManagementMenu {
@@ -23,7 +24,8 @@ public class PcManagementMenu {
     public record AddPcInput(String pcName, String roomName, PCStatus status, String configuration) {
     }
 
-    public record EditPcInput(int pcId, String newName, String newRoomName, PCStatus newStatus, String newConfiguration) {
+    public record EditPcInput(int pcId, String newName, String newRoomName, PCStatus newStatus,
+                              String newConfiguration) {
     }
 
     public record DeletePcInput(int pcId, String confirm) {
@@ -46,41 +48,40 @@ public class PcManagementMenu {
             System.out.println("\t5. View Room List");
             System.out.println("\t6. View PCs by Room");
             System.out.println("\t0. Back to Admin System");
-            System.out.print(GREEN + "  ➤ Select an option: " + RESET);
+            int choice = ConsoleInput.readInt(scanner, GREEN + "  ➤ Select an option: " + RESET, "\tPlease enter a valid number.");
 
-            String input = promptMenuChoice(scanner);
-
-            switch (input) {
-                case "1" -> {
+            switch (choice) {
+                case 1 -> {
                     pcController.listPcs();
                     ConsoleInput.pressEnterToContinue(scanner);
                 }
-                case "5" -> {
+                case 5 -> {
                     showRooms();
                     ConsoleInput.pressEnterToContinue(scanner);
                 }
-                case "6" -> {
+                case 6 -> {
                     viewPcsByRoom(scanner);
                     ConsoleInput.pressEnterToContinue(scanner);
                 }
-                case "2" -> {
+                case 2 -> {
                     AddPcInput addInput = promptAddPc(scanner);
                     pcController.addPc(addInput);
                     ConsoleInput.pressEnterToContinue(scanner);
                 }
-                case "3" -> {
+                case 3 -> {
                     EditPcInput editInput = promptEditPc(scanner);
                     pcController.editPc(editInput);
                     ConsoleInput.pressEnterToContinue(scanner);
                 }
-                case "4" -> {
+                case 4 -> {
                     DeletePcInput deleteInput = promptDeletePc(scanner);
                     pcController.deletePc(deleteInput);
                     ConsoleInput.pressEnterToContinue(scanner);
                 }
-                case "0" -> {
+                case 0 -> {
                     return;
                 }
+                default -> System.out.println("\tInvalid choice. Please try again.");
             }
         }
     }
@@ -92,13 +93,13 @@ public class PcManagementMenu {
                 System.out.println("\tNo rooms found.");
                 return;
             }
-            System.out.println("\n+------+----------------------+" );
+            System.out.println("\n+------+----------------------+");
             System.out.printf("| %-4s | %-20s |%n", "ID", "ROOM NAME");
-            System.out.println("+------+----------------------+" );
+            System.out.println("+------+----------------------+");
             for (Room r : rooms) {
-                System.out.printf("| %-4d | %-20s |%n", r.getRoomId(), r.getRoomName());
+                System.out.printf("| %-4d | %-20s |%n", r.roomId(), r.roomName());
             }
-            System.out.println("+------+----------------------+" );
+            System.out.println("+------+----------------------+");
         } catch (RuntimeException ex) {
             System.out.println("\tFailed to load rooms: " + ex.getMessage());
         }
@@ -118,7 +119,7 @@ public class PcManagementMenu {
         }
         System.out.println("\nSelect room:");
         for (int i = 0; i < rooms.size(); i++) {
-            System.out.printf("\t%d. %s%n", i + 1, rooms.get(i).getRoomName());
+            System.out.printf("\t%d. %s%n", i + 1, rooms.get(i).roomName());
         }
         System.out.println("\t0. Cancel");
         System.out.print(GREEN + "  ➤ Your choice: " + RESET);
@@ -126,52 +127,32 @@ public class PcManagementMenu {
         int idx;
         try {
             idx = Integer.parseInt(ConsoleInput.readLineOrThrow(scanner).trim());
-        } catch (Exception ex) {
+            if (idx == 0) return;
+        } catch (Exception e) {
             System.out.println("\tInvalid input.");
             return;
         }
-        if (idx == 0) return;
         if (idx < 1 || idx > rooms.size()) {
             System.out.println("\tInvalid choice.");
             return;
         }
         Room selected = rooms.get(idx - 1);
-        System.out.println("\n=== PCS IN ROOM: " + selected.getRoomName() + " ===");
-        pcController.listPcsByRoomId(selected.getRoomId());
-    }
-
-    private static String promptMenuChoice(Scanner scanner) {
-        while (true) {
-                if (!scanner.hasNextLine()) {
-                    System.out.println("\n[EOF] No more input. Returning...");
-                    return "0";
-                }
-                String input = scanner.nextLine().trim();
-            switch (input) {
-                case "0", "1", "2", "3", "4", "5", "6" -> {
-                    return input;
-                }
-                default -> {
-                    System.out.print("\tInvalid choice.\n");
-                    System.out.print(GREEN + "  ➤ Select an option: " + RESET);
-                }
-            }
-        }
+        System.out.println("\n=== PCS IN ROOM: " + selected.roomName() + " ===");
+        pcController.listPcsByRoomId(selected.roomId());
     }
 
     private static AddPcInput promptAddPc(Scanner scanner) {
         System.out.println(CYAN + BOLD + "\n  === ADD NEW PC ===" + RESET);
         String pcName = ConsoleInput.readNonEmpty(scanner, "\tPC Name: ", "\tPC Name cannot be empty.").trim();
         String roomName = promptRoomName(scanner, false);
-        PCStatus status = promptStatus(scanner, false);
         System.out.print("\tConfiguration (e.g. i5 | 16GB | 3060): ");
         String configuration = scanner.nextLine().trim();
-        return new AddPcInput(pcName, roomName, status, configuration.isEmpty() ? null : configuration);
+        return new AddPcInput(pcName, roomName, AVAILABLE, configuration.isEmpty() ? null : configuration);
     }
 
     private static EditPcInput promptEditPc(Scanner scanner) {
         System.out.println(CYAN + BOLD + "\n  === EDIT PC INFOR ===" + RESET);
-        int pcId = promptPositiveInt(scanner, "\tEnter PC ID to edit: ");
+        int pcId = promptPositiveInt(scanner);
 
         // Display current PC information first
         PC currentPc = pcController.getPcService().getById(pcId).orElse(null);
@@ -195,7 +176,7 @@ public class PcManagementMenu {
 
     private static DeletePcInput promptDeletePc(Scanner scanner) {
         System.out.println(CYAN + BOLD + "\n  === DELETE PC ===" + RESET);
-        int pcId = promptPositiveInt(scanner, "\tEnter PC ID to delete: ");
+        int pcId = promptPositiveInt(scanner);
         PC currentPc = pcController.getPcService().getById(pcId).orElse(null);
 
         if (currentPc == null || currentPc.getStatus() == PCStatus.DELETED) {
@@ -209,11 +190,13 @@ public class PcManagementMenu {
         return new DeletePcInput(pcId, confirm);
     }
 
-    private static int promptPositiveInt(Scanner scanner, String prompt) {
+    private static int promptPositiveInt(Scanner scanner) {
         while (true) {
-            int value = ConsoleInput.readInt(scanner, prompt, "\tPC ID must be a positive number.");
-            if (value > 0) {
-                return value;
+            try {
+                int value = Integer.parseInt(ConsoleInput.readLineOrThrow(scanner).trim());
+                if (value > 0) return value;
+            } catch (Exception e) {
+                // ignore
             }
             System.out.println("\tPC ID must be a positive number.");
         }
@@ -222,8 +205,8 @@ public class PcManagementMenu {
     private static String promptYesNo(Scanner scanner) {
         while (true) {
             System.out.print("\tConfirm deletion? (Y/N): ");
-                if (!scanner.hasNextLine()) return "N";
-                String input = scanner.nextLine().trim();
+            if (!scanner.hasNextLine()) return "N";
+            String input = scanner.nextLine().trim();
             if (input.equalsIgnoreCase("Y") || input.equalsIgnoreCase("N")) {
                 return input;
             }
@@ -238,30 +221,23 @@ public class PcManagementMenu {
                 rooms = roomDao.findAll();
             } catch (RuntimeException ex) {
                 System.out.println("\tFailed to load rooms: " + ex.getMessage());
-                if (allowKeepCurrent) {
-                    return "";
-                }
+                if (allowKeepCurrent) return "";
                 continue;
             }
-
             System.out.println("\tSelect Room" + (allowKeepCurrent ? " (Enter to keep current)" : ":"));
             for (int i = 0; i < rooms.size(); i++) {
-                System.out.println("\t" + (i + 1) + ". " + rooms.get(i).getRoomName());
+                System.out.println("\t" + (i + 1) + ". " + rooms.get(i).roomName());
             }
             System.out.print(GREEN + "  ➤ Your choice: " + RESET);
-
             String input = scanner.nextLine().trim();
-            if (allowKeepCurrent && input.isEmpty()) {
-                return "";
-            }
-
+            if (allowKeepCurrent && input.isEmpty()) return "";
             try {
                 int choice = Integer.parseInt(input);
                 if (choice < 1 || choice > rooms.size()) {
                     System.out.println("\tInvalid choice.");
-                    continue;
+                } else {
+                    return rooms.get(choice - 1).roomName();
                 }
-                return rooms.get(choice - 1).getRoomName();
             } catch (NumberFormatException e) {
                 System.out.println("\tPlease enter a number.");
             }
@@ -269,35 +245,24 @@ public class PcManagementMenu {
     }
 
     private static PCStatus promptStatus(Scanner scanner, boolean allowKeepCurrent) {
-        while (true) {
-            System.out.println("\tEnter status" + (allowKeepCurrent ? " (Enter to keep current)" : ":"));
-            System.out.println("\t1. AVAILABLE");
-            System.out.println("\t2. IN_USE");
-            System.out.println("\t3. MAINTENANCE");
-            System.out.println("\t4. BOOKED");
-            System.out.print(GREEN + "  ➤ Your choice: " + RESET);
-
-            String input = scanner.nextLine().trim();
-            if (allowKeepCurrent && input.isEmpty()) {
-                return null;
+        System.out.println("\tEnter status" + (allowKeepCurrent ? " (Enter to keep current)" : ":"));
+        System.out.println("\t1. AVAILABLE");
+        System.out.println("\t2. IN_USE");
+        System.out.println("\t3. MAINTENANCE");
+        System.out.println("\t4. BOOKED");
+        System.out.print(GREEN + "  ➤ Your choice: " + RESET);
+        String input = scanner.nextLine().trim();
+        if (allowKeepCurrent && input.isEmpty()) return null;
+        return switch (input) {
+            case "1" -> AVAILABLE;
+            case "2" -> PCStatus.IN_USE;
+            case "3" -> PCStatus.MAINTENANCE;
+            case "4" -> PCStatus.BOOKED;
+            default -> {
+                System.out.println("\tInvalid choice. Please select 1-4.");
+                yield promptStatus(scanner, allowKeepCurrent);
             }
-
-            switch (input) {
-                case "1" -> {
-                    return PCStatus.AVAILABLE;
-                }
-                case "2" -> {
-                    return PCStatus.IN_USE;
-                }
-                case "3" -> {
-                    return PCStatus.MAINTENANCE;
-                }
-                case "4" -> {
-                    return PCStatus.BOOKED;
-                }
-                default -> System.out.println("\tInvalid choice. Please select 1-4.");
-            }
-        }
+        };
     }
 }
 

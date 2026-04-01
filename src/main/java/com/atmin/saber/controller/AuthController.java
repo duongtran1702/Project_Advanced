@@ -35,9 +35,6 @@ public class AuthController {
                     case 2:
                         handleRegister(AuthMenu.promptRegister(sc));
                         break;
-                    case 3:
-                        handleGuest();
-                        break;
                     case 0:
                         System.out.println("Exit!");
                         return;
@@ -102,19 +99,6 @@ public class AuthController {
         }
     }
 
-    private void handleGuest() {
-        // Guest has CUSTOMER role but no authenticated user.
-        SessionContext.clearCurrentUser();
-        SessionContext.setCurrentRole(UserRole.CUSTOMER);
-
-        // Guest menu (restricted): reuse CustomerMenu, but it will block actions requiring login.
-        CustomerMenu customerMenu = CustomerMenu.createDefault(sc);
-        customerMenu.showMenu();
-
-        // Ensure we don't keep guest session when returning to Auth menu
-        SessionContext.clearCurrentRole();
-        SessionContext.clearCurrentUser();
-    }
 
     private void handleLogin(AuthMenu.LoginInput loginInput) {
         String username = loginInput.username().trim();

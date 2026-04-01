@@ -6,8 +6,11 @@ import com.atmin.saber.model.OrderDetail;
 import com.atmin.saber.util.DBConnection;
 import com.atmin.saber.util.JdbcTemplate;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 
 public class OrderDetailDaoImpl implements OrderDetailDao {
@@ -22,6 +25,21 @@ public class OrderDetailDaoImpl implements OrderDetailDao {
     public List<OrderDetail> findByOrderId(int orderId) {
         String sql = "SELECT " + SqlConstants.ORDER_DETAIL_COLUMNS + " FROM order_details WHERE order_id = ?";
         return jdbcTemplate.query(sql, this::map, orderId);
+    }
+
+    @Override
+    public List<OrderDetail> findByOrderId(Connection con, int orderId) throws SQLException {
+        String sql = "SELECT " + SqlConstants.ORDER_DETAIL_COLUMNS + " FROM order_details WHERE order_id = ?";
+        List<OrderDetail> result = new ArrayList<>();
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, orderId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(map(rs));
+                }
+            }
+        }
+        return result;
     }
 
     private OrderDetail map(ResultSet rs) throws SQLException {

@@ -18,4 +18,3 @@ public interface WalletService {
     boolean charge(String userId, BigDecimal amount, String description);
 
 }
-

@@ -60,7 +60,8 @@ public class PcController {
                 System.out.println("\tInvalid input for adding a PC.");
                 return;
             }
-            pcService.add(new PC(0, input.pcName(), null, input.roomName(), input.status(), input.configuration()));
+            PCStatus status = input.status() != null ? input.status() : PCStatus.AVAILABLE;
+            pcService.add(new PC(0, input.pcName(), null, input.roomName(), status, input.configuration()));
             System.out.println("\tPC added successfully!");
         } catch (RuntimeException ex) {
             System.out.println("\tFailed to add PC: " + ex.getMessage());

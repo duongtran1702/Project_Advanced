@@ -1,5 +1,6 @@
 package com.atmin.saber.presentation;
 
+import com.atmin.saber.dao.UserDao;
 import com.atmin.saber.model.Order;
 import com.atmin.saber.model.enums.OrderStatus;
 import com.atmin.saber.service.OrderService;
@@ -18,17 +19,18 @@ import static com.atmin.saber.util.CyberColors.*;
  * - View pending F&B orders (PENDING)
  * - Advance order status: PENDING -> COMPLETED
  */
-public class StaffMenu {
+public class StaffMenu extends BaseMenu {
     private final OrderService orderService;
-    private final Scanner scanner;
+    private final UserDao userDao;
 
-    public StaffMenu(OrderService orderService, Scanner scanner) {
+    public StaffMenu(OrderService orderService, UserDao userDao, Scanner scanner) {
+        super(scanner);
         this.orderService = orderService;
-        this.scanner = scanner;
+        this.userDao = userDao;
     }
 
     public static StaffMenu createDefault(Scanner scanner) {
-        return new StaffMenu(AppFactory.orderService(), scanner);
+        return new StaffMenu(AppFactory.orderService(), AppFactory.userDao(), scanner);
     }
 
     public void showMenu() {
@@ -42,9 +44,9 @@ public class StaffMenu {
 
             String choice = promptMenuChoice(scanner);
             switch (choice) {
-                case "1" -> safeRun(this::viewPendingOrders);
-                case "2" -> safeRun(this::advanceOrderLogic);
-                case "3" -> safeRun(this::rejectOrderLogic);
+                case "1" -> safeRunWithConsoleInputPause(this::viewPendingOrders);
+                case "2" -> safeRunWithConsoleInputPause(this::advanceOrderLogic);
+                case "3" -> safeRunWithConsoleInputPause(this::rejectOrderLogic);
                 case "0" -> {
                     return;
                 }
@@ -71,21 +73,16 @@ public class StaffMenu {
             ConsoleInput.pressEnterToContinue(scanner);
             return;
         }
-
         System.out.print("Enter Order ID to advance, or 'ALL' to advance all (0 to return): ");
-        if (!scanner.hasNextLine()) return;
-        
-        String input = scanner.nextLine().trim();
-        if ("0".equals(input) || input.isEmpty()) {
-            return;
-        }
+        String input = readLineOrNull();
+        if (input == null || input.trim().isEmpty() || "0".equals(input.trim())) return;
 
-        if ("ALL".equalsIgnoreCase(input)) {
+        if ("ALL".equalsIgnoreCase(input.trim())) {
             int updated = orderService.advanceAllPendingOrdersForStaff();
             System.out.println("[OK] Updated " + updated + " pending order(s).");
         } else {
             try {
-                int orderId = Integer.parseInt(input);
+                int orderId = Integer.parseInt(input.trim());
                 OrderStatus next = orderService.advanceOrderStatusForStaff(orderId);
                 System.out.println("[OK] Updated status to: " + next.name() + formatStaffMeaning(next));
             } catch (NumberFormatException e) {
@@ -103,17 +100,12 @@ public class StaffMenu {
             ConsoleInput.pressEnterToContinue(scanner);
             return;
         }
-
         System.out.print("Enter Order ID to REJECT (or 0 to return): ");
-        if (!scanner.hasNextLine()) return;
-        
-        String input = scanner.nextLine().trim();
-        if ("0".equals(input) || input.isEmpty()) {
-            return;
-        }
+        String input = readLineOrNull();
+        if (input == null || input.trim().isEmpty() || "0".equals(input.trim())) return;
 
         try {
-            int orderId = Integer.parseInt(input);
+            int orderId = Integer.parseInt(input.trim());
             orderService.rejectOrderAndRefund(orderId);
             System.out.println("[OK] Order rejected and refunded.");
         } catch (NumberFormatException e) {
@@ -131,28 +123,27 @@ public class StaffMenu {
             if (pauseAfter) ConsoleInput.pressEnterToContinue(scanner);
             return;
         }
-
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-        System.out.println("+------+--------------------------------------+------------+----------------------+-----------+---------------+");
-        System.out.printf("| %-4s | %-36s | %-10s | %-20s | %-9s | %-13s |%n",
-                "NO", "ORDER ID", "CUSTOMER", "ORDER TIME", "STATUS", "TOTAL");
-        System.out.println("+------+--------------------------------------+------------+----------------------+-----------+---------------+");
+        System.out.println("+-----+-------+----------+----------+----------------------+-----------+----------+");
+        System.out.printf("| %-3s | %-5s | %-8s | %-8s | %-20s | %-9s | %-8s |%n",
+                "NO", "ORDID", "CUSTOMER", "CUSTID", "ORDER TIME", "STATUS", "TOTAL");
+        System.out.println("+-----+-------+----------+----------+----------------------+-----------+----------+");
         int i = 1;
         for (Order o : orders) {
-            System.out.printf("| %-4d | %-36s | %-10s | %-20s | %-9s | %-13s |%n",
-                    i++,
-                    o.getOrderId(),
-                    shortId(o.getCustomerId()),
+            String username = getUsernameOrId(o.getCustomerId());
+            System.out.printf("| %-3d | %-5d | %-8s | %-8s | %-20s | %-9s | %-8s |%n",
+                    i++, o.getOrderId(),
+                    safeLength(username),
+                    safeLength(o.getCustomerId()),
                     o.getOrderTime() == null ? "" : o.getOrderTime().format(fmt),
                     o.getStatus() == null ? "" : o.getStatus().name(),
-                    o.getTotalAmount());
+                    o.getTotalAmount() == null ? "0.00" : safeLength(o.getTotalAmount().toString()));
         }
-        System.out.println("+------+--------------------------------------+------------+----------------------+-----------+---------------+");
+        System.out.println("+-----+-------+----------+----------+----------------------+-----------+----------+");
         if (pauseAfter) ConsoleInput.pressEnterToContinue(scanner);
     }
 
     private static String formatStaffMeaning(OrderStatus status) {
-        if (status == null) return "";
         return switch (status) {
             case PENDING -> " (Confirmed)";
             case COMPLETED -> " (Completed)";
@@ -161,17 +152,14 @@ public class StaffMenu {
         };
     }
 
-    private static String shortId(String id) {
-        if (id == null) return "";
-        return id.length() <= 8 ? id : id.substring(0, 8);
-    }
 
-    private void safeRun(Runnable action) {
+    private String getUsernameOrId(String customerId) {
         try {
-            action.run();
-        } catch (RuntimeException ex) {
-            System.out.println("Error: " + ex.getMessage());
-            ConsoleInput.pressEnterToContinue(scanner);
+            return userDao.findById(customerId)
+                    .map(user -> user.getUsername() != null ? user.getUsername() : customerId)
+                    .orElse(customerId);
+        } catch (Exception e) {
+            return customerId;
         }
     }
 }

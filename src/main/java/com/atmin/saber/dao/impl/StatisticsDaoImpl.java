@@ -35,9 +35,10 @@ public class StatisticsDaoImpl implements StatisticsDao {
 
     @Override
     public Map<LocalDate, BigDecimal> fnbRevenueByDay(YearMonth month) {
-        // orders revenue recognized by order_time when PAID
+        // orders revenue recognized by order_time when order is placed (PENDING status)
+        // Money is charged to wallet immediately when order is created
         String sql = "SELECT DATE(order_time) d, SUM(total_amount) total " +
-                "FROM orders WHERE status = 'PAID' " +
+                "FROM orders WHERE status IN ('PENDING','COMPLETED','PAID') " +
                 "AND order_time >= ? AND order_time < ? " +
                 "GROUP BY DATE(order_time) ORDER BY d";
         return queryLocalDateSum(sql, month);
@@ -61,6 +62,15 @@ public class StatisticsDaoImpl implements StatisticsDao {
         return queryLocalDateSum(sql, month);
     }
 
+    @Override
+    public Map<LocalDate, BigDecimal> refundByDay(YearMonth month) {
+        String sql = "SELECT DATE(created_at) d, SUM(amount) total " +
+                "FROM transactions WHERE transaction_type = 'REFUND' " +
+                "AND created_at >= ? AND created_at < ? " +
+                "GROUP BY DATE(created_at) ORDER BY d";
+        return queryLocalDateSum(sql, month);
+    }
+
     private Map<LocalDate, BigDecimal> queryLocalDateSum(String sql, YearMonth month) {
         Objects.requireNonNull(month, "month must not be null");
         Map<LocalDate, BigDecimal> map = new HashMap<>();
@@ -75,7 +85,9 @@ public class StatisticsDaoImpl implements StatisticsDao {
                     java.sql.Date d = rs.getDate("d");
                     BigDecimal total = rs.getBigDecimal("total");
                     if (d == null) continue;
-                    map.put(d.toLocalDate(), total == null ? BigDecimal.ZERO : total);
+                    // Ensure all amounts are stored as positive values
+                    BigDecimal absTotal = total == null ? BigDecimal.ZERO : total.abs();
+                    map.put(d.toLocalDate(), absTotal);
                 }
             }
         } catch (SQLException e) {

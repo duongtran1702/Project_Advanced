@@ -65,6 +65,9 @@ public class OrderDaoImpl implements OrderDao {
 
     @Override
     public void insertDetails(Connection con, int orderId, List<OrderDetail> details) {
+        if (details == null || details.isEmpty()) {
+            return; // Nothing to insert
+        }
         String sql = "INSERT INTO order_details(order_id, id, quantity, unit_price) VALUES(?, ?, ?, ?)";
         try (PreparedStatement ps = con.prepareStatement(sql)) {
             for (OrderDetail d : details) {
@@ -74,7 +77,16 @@ public class OrderDaoImpl implements OrderDao {
                 ps.setBigDecimal(4, d.getUnitPrice());
                 ps.addBatch();
             }
-            ps.executeBatch();
+            int[] result = ps.executeBatch();
+            // Verify all details were inserted
+            if (result.length != details.size()) {
+                throw new RuntimeException("Expected " + details.size() + " inserts but got " + result.length);
+            }
+            for (int i = 0; i < result.length; i++) {
+                if (result[i] != 1) {
+                    throw new RuntimeException("Failed to insert order detail " + i);
+                }
+            }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to insert order details: " + e.getMessage(), e);
         }
